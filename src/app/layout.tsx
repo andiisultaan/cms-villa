@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Gonjong Harau | Administration",
   description: "Manage your villa reservations",
   icons: {
-    icon: "/assets/logo.ico",
+    icon: "/assets/logo.png",
   },
 };
 
