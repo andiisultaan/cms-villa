@@ -6,39 +6,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/navigation";
+import { toast, Toaster } from "sonner";
+import { handleAddUser } from "./action";
+
+interface FormData {
+  username?: string;
+  password?: string;
+  role?: string;
+}
 
 export default function AddUser() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
-  const [message, setMessage] = useState({ type: "", content: "" });
+  const [formData, setFormData] = useState<FormData>({});
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real application, you would send this data to your backend API
-    console.log("New user:", { username, password, email, role });
-
-    // Simulating a successful user creation
-    setMessage({ type: "success", content: "User created successfully!" });
-
-    // Reset form
-    setUsername("");
-    setPassword("");
-    setEmail("");
-    setRole("");
-
-    // In a real app, you might redirect to a user list page
-    // setTimeout(() => router.push('/users'), 2000)
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prevData => ({
+      ...prevData,
+      [name]: value,
+    }));
   };
+
+  const handleSelectChange = (value: string) => {
+    setFormData(prevData => ({
+      ...prevData,
+      role: value,
+    }));
+  };
+
+  async function addUser(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const response = await handleAddUser(formData);
+
+      if (response.statusCode === 201) {
+        toast.success("Success! Your account has been registered.", {
+          description: "Redirecting you to the login page...",
+        });
+        router.push("/");
+      } else if (response.statusCode === 400) {
+        toast.error(response.error || "Registration failed", {
+          description: "Please check your information and try again.",
+        });
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred", {
+        description: "Please try again later.",
+      });
+    }
+  }
 
   return (
     <>
       <div className="flex h-screen bg-gray-100">
+        <Toaster richColors />
         <Navigation />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="container mx-auto p-4">
@@ -47,22 +70,18 @@ export default function AddUser() {
                 <CardTitle className="text-2xl text-center">Add New User</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={addUser} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
-                    <Input id="username" value={username} onChange={e => setUsername(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                    <Input id="username" name="username" type="text" value={formData.username || ""} onChange={handleChange} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                    <Input id="password" type="password" name="password" value={formData.password || ""} onChange={handleChange} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>
-                    <Select value={role} onValueChange={setRole} required>
+                    <Select value={formData.role} onValueChange={handleSelectChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
@@ -72,11 +91,6 @@ export default function AddUser() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {message.content && (
-                    <Alert variant={message.type === "success" ? "default" : "destructive"}>
-                      <AlertDescription>{message.content}</AlertDescription>
-                    </Alert>
-                  )}
                   <Button type="submit" className="w-full">
                     Add User
                   </Button>
