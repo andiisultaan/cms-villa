@@ -4,12 +4,11 @@ import { getUserByUsername } from "@/db/models/user";
 import { compareTextWithHash } from "@/db/utils/bcrypt";
 import { signToken } from "@/lib/jwt";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-export const handleLogin = async (formData: FormData) => {
+export const handleLogin = async (prevState: any, formData: FormData) => {
   const loginInputSchema = z.object({
     username: z.string().min(1, { message: "Username is required" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),
@@ -25,13 +24,13 @@ export const handleLogin = async (formData: FormData) => {
     const errMessage = parsedData.error.issues[0].message;
     const errFinalMessage = `${errPath} - ${errMessage}`;
 
-    return redirect(`${BASE_URL}/login?error=${errFinalMessage}`);
+    return { error: errFinalMessage };
   }
 
   const user = await getUserByUsername(parsedData.data.username);
 
   if (!user || !compareTextWithHash(parsedData.data.password, user.password)) {
-    return redirect(`${BASE_URL}/login?error=Invalid%20Credentials`);
+    return { error: "Invalid Credentials" };
   }
 
   const payload = {
@@ -48,5 +47,5 @@ export const handleLogin = async (formData: FormData) => {
     sameSite: "strict",
   });
 
-  return redirect(`${BASE_URL}`);
+  return { success: "Login successful" };
 };
