@@ -41,3 +41,10 @@ export const createUser = async (user: UserModelCreateInput) => {
 
   return result;
 };
+
+export const getUserByUsername = async (username: string) => {
+  const db = await getDb();
+  const user = (await db.collection(COLLECTION_NAME).findOne({ username: username })) as UserModel;
+
+  return user;
+};
