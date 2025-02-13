@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  experimental: {
+    serverActions: true,
+  },
+  api: {
+    bodyParser: false, // Disable the default body parser for API routes
+  },
+};
 
 export default nextConfig;

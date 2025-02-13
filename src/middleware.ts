@@ -7,6 +7,12 @@ const middleware = async (request: NextRequest) => {
   const token = cookieStore.get("token");
   const loginUrl = new URL("/login", request.url);
 
+  // Add custom header to all API routes
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    // For API routes, just pass through without modifying
+    return NextResponse.next();
+  }
+
   // Allow access to login page without a token
   if (request.nextUrl.pathname === "/login") {
     return NextResponse.next();
@@ -43,5 +49,8 @@ export default middleware;
 
 // Apply this middleware to all routes except static files
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/api/:path*", // Include API routes
+  ],
 };

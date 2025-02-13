@@ -87,36 +87,46 @@ export default function AddVilla() {
     setPreviewUrls(prevUrls => prevUrls.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function addVilla(e: React.FormEvent) {
     e.preventDefault();
+    const formDataToSend = new FormData();
+
+    // Append all form fields
+    formDataToSend.append("name", formData.name);
+    formDataToSend.append("description", formData.description);
+    formDataToSend.append("price", formData.price);
+    formDataToSend.append("capacity", formData.capacity);
+    formDataToSend.append("status", formData.status);
+
+    // Append all images
+    formData.images.forEach((image, index) => {
+      formDataToSend.append(`images`, image);
+    });
+
     try {
-      const submitData = new FormData();
-      submitData.append("name", formData.name);
-      submitData.append("description", formData.description);
-      submitData.append("price", formData.price);
-      submitData.append("capacity", formData.capacity);
-      submitData.append("status", formData.status);
-      formData.images.forEach((image, index) => {
-        submitData.append(`image${index}`, image);
+      const response = await fetch("/api/villas", {
+        method: "POST",
+        body: formDataToSend, // Send as FormData
       });
 
-      console.log("Form data to be submitted:", Object.fromEntries(submitData));
+      const data = await response.json();
 
-      toast.success("Villa added successfully!");
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        capacity: "",
-        status: "available",
-        images: [],
-      });
-      setPreviewUrls([]);
-      router.push("/");
+      if (response.ok) {
+        toast.success("Successfully added new villa!", {
+          description: "Redirecting you to the dashboard page...",
+        });
+        router.push("/");
+      } else {
+        toast.error(data.error || "Failed to add villa", {
+          description: "Please check your information and try again.",
+        });
+      }
     } catch (error) {
-      toast.error("Failed to add villa");
+      toast.error("An unexpected error occurred", {
+        description: "Please try again later.",
+      });
     }
-  };
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -129,7 +139,7 @@ export default function AddVilla() {
               <CardTitle className="text-2xl font-bold">Add New Villa</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={addVilla} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">Villa Name</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleChange} required />

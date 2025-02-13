@@ -5,10 +5,10 @@ export type VillaModel = {
   _id: ObjectId;
   name: string;
   description: string;
-  price: number;
-  capacity: number;
+  price: string;
+  capacity: string;
   status: "available" | "booked" | "maintenance";
-  images: string[];
+  images: Array<{ url: string; publicId: string }>;
 };
 
 export type VillaModelCreateInput = Omit<VillaModel, "_id">;

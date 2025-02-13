@@ -1,5 +1,7 @@
 import { createVilla, getVillas } from "@/db/models/villa";
-import { NextResponse } from "next/server";
+import cloudinary from "@/lib/cloudinary";
+import { NextRequest, NextResponse } from "next/server";
+import { UploadApiResponse } from "cloudinary";
 import { z } from "zod";
 
 type MyResponse<T> = {
@@ -7,6 +9,11 @@ type MyResponse<T> = {
   message?: string;
   data?: T;
   error?: string;
+};
+
+type CloudinaryResult = {
+  secure_url: string;
+  public_id: string;
 };
 
 // GET Villas
@@ -27,16 +34,49 @@ export const GET = async () => {
 const villaInputSchema = z.object({
   name: z.string().min(1, { message: "Villa name is required" }),
   description: z.string().min(1, { message: "Description is required" }),
-  price: z.number().positive({ message: "Price must be a positive number" }),
-  capacity: z.number().int().positive({ message: "Capacity must be a positive integer" }),
-  status: z.enum(["available", "booked", "maintenance"], { message: "Status must be either 'available', 'booked', or 'maintenance'" }),
-  images: z.array(z.string().url({ message: "Invalid image URL" })).min(1, { message: "At least one image is required" }),
+  price: z
+    .string()
+    .min(1, { message: "Price is required" })
+    .refine(val => !isNaN(Number(val)) && Number(val) > 0, {
+      message: "Price must be a positive number",
+    }),
+  capacity: z
+    .string()
+    .min(1, { message: "Capacity is required" })
+    .refine(val => !isNaN(Number(val)) && Number.isInteger(Number(val)) && Number(val) > 0, {
+      message: "Capacity must be a positive integer",
+    }),
+  status: z.enum(["available", "booked", "maintenance"], {
+    errorMap: () => ({ message: "Status must be either 'available', 'booked', or 'maintenance'" }),
+  }),
+  images: z.array(z.instanceof(File)).min(1, { message: "At least one image is required" }),
 });
 
 // Add villa
-export const POST = async (req: Request) => {
+export const POST = async (req: NextRequest) => {
   try {
-    const data = await req.json();
+    const contentType = req.headers.get("content-type");
+    console.log("Content-Type:", contentType);
+    if (!contentType || !contentType.includes("multipart/form-data")) {
+      return NextResponse.json<MyResponse<never>>(
+        {
+          statusCode: 400,
+          error: "Invalid content type. Expected multipart/form-data.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const formData = await req.formData();
+
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
+    const price = formData.get("price") as string;
+    const capacity = formData.get("capacity") as string;
+    const status = formData.get("status") as string;
+    const images = formData.getAll("images") as File[];
+
+    const data = { name, description, price, capacity, status, images };
 
     const parsedData = villaInputSchema.safeParse(data);
 
@@ -44,7 +84,34 @@ export const POST = async (req: Request) => {
       throw parsedData.error;
     }
 
-    const villa = await createVilla(parsedData.data);
+    // Process images
+    const processedImages = await Promise.all(
+      images.map(async image => {
+        const arrayBuffer = await image.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Upload to Cloudinary
+        const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream({ folder: "villas" }, (error, result) => {
+              if (error) reject(error);
+              else resolve(result as UploadApiResponse);
+            })
+            .end(buffer);
+        });
+
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+        };
+      })
+    );
+
+    // Create villa with Cloudinary image URLs
+    const villa = await createVilla({
+      ...parsedData.data,
+      images: processedImages,
+    });
 
     return NextResponse.json<MyResponse<unknown>>(
       {
@@ -57,6 +124,7 @@ export const POST = async (req: Request) => {
       }
     );
   } catch (error) {
+    console.error(error);
     if (error instanceof z.ZodError) {
       const errMessage = error.issues[0].message;
 
