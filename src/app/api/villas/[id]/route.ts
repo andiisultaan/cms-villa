@@ -1,5 +1,7 @@
-import { deleteVilla, getVillaById, updateVilla } from "@/db/models/villa";
-import { NextResponse } from "next/server";
+import { deleteVilla, getVillaById, serializeVilla, updateVilla } from "@/db/models/villa";
+import cloudinary from "@/lib/cloudinary";
+import { UploadApiResponse } from "cloudinary";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 type MyResponse<T> = {
@@ -91,43 +93,110 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 }
 
-const statusUpdateSchema = z.object({
-  status: z.enum(["available", "booked", "maintenance"], {
-    message: "Status must be either 'available', 'booked', or 'maintenance'",
-  }),
+const villaUpdateSchema = z.object({
+  name: z.string().min(1, { message: "Villa name is required" }).optional(),
+  description: z.string().min(1, { message: "Description is required" }).optional(),
+  price: z
+    .string()
+    .min(1, { message: "Price is required" })
+    .refine(val => !isNaN(Number(val)) && Number(val) > 0, {
+      message: "Price must be a positive number",
+    })
+    .optional(),
+  capacity: z
+    .string()
+    .min(1, { message: "Capacity is required" })
+    .refine(val => !isNaN(Number(val)) && Number.isInteger(Number(val)) && Number(val) > 0, {
+      message: "Capacity must be a positive integer",
+    })
+    .optional(),
+  status: z
+    .enum(["available", "booked", "maintenance"], {
+      errorMap: () => ({ message: "Status must be either 'available', 'booked', or 'maintenance'" }),
+    })
+    .optional(),
+  existingImages: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        publicId: z.string(),
+      })
+    )
+    .optional(),
+  newImages: z.array(z.instanceof(File)).optional(),
 });
 
-// PATCH Villa Status
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const id = params.id;
-    const data = await request.json();
-
-    const parsedData = statusUpdateSchema.safeParse(data);
-
-    if (!parsedData.success) {
+    const contentType = req.headers.get("content-type");
+    if (!contentType || !contentType.includes("multipart/form-data")) {
       return NextResponse.json<MyResponse<never>>(
         {
           statusCode: 400,
-          error: parsedData.error.issues[0].message,
+          error: "Invalid content type. Expected multipart/form-data.",
         },
         { status: 400 }
       );
     }
 
-    const existingVilla = await getVillaById(id);
+    const formData = await req.formData();
 
-    if (!existingVilla) {
-      return NextResponse.json<MyResponse<never>>(
-        {
-          statusCode: 404,
-          error: "Villa not found",
-        },
-        { status: 404 }
-      );
-    }
+    const name = formData.get("name") as string | null;
+    const description = formData.get("description") as string | null;
+    const price = formData.get("price") as string | null;
+    const capacity = formData.get("capacity") as string | null;
+    const status = formData.get("status") as string | null;
+    const existingImagesJson = formData.get("existingImages") as string | null;
+    const newImages = formData.getAll("newImages") as File[];
 
-    const result = await updateVilla(id, { status: parsedData.data.status });
+    const existingImages = existingImagesJson ? JSON.parse(existingImagesJson) : [];
+
+    const data = {
+      name,
+      description,
+      price,
+      capacity,
+      status,
+      existingImages,
+      newImages,
+    };
+
+    const parsedData = villaUpdateSchema.parse(data);
+
+    // Process new images
+    const processedNewImages = await Promise.all(
+      (parsedData.newImages || []).map(async image => {
+        const arrayBuffer = await image.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Upload to Cloudinary
+        const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream({ folder: "villas" }, (error, result) => {
+              if (error) reject(error);
+              else resolve(result as UploadApiResponse);
+            })
+            .end(buffer);
+        });
+
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+        };
+      })
+    );
+
+    // Combine existing and new images
+    const allImages = [...(parsedData.existingImages || []), ...processedNewImages];
+
+    // Update villa data
+    const updatedVillaData = {
+      ...parsedData,
+      images: allImages,
+    };
+
+    const result = await updateVilla(id, updatedVillaData);
 
     if (result.matchedCount === 0) {
       return NextResponse.json<MyResponse<never>>(
@@ -140,16 +209,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const updatedVilla = await getVillaById(id);
+    const serializedUpdatedVilla = serializeVilla(updatedVilla);
 
-    return NextResponse.json<MyResponse<unknown>>(
+    return NextResponse.json<MyResponse<typeof serializedUpdatedVilla>>(
       {
         statusCode: 200,
-        message: `Success PATCH /api/villas/${id}`,
-        data: updatedVilla,
+        message: `Success PUT /api/villas/${id}`,
+        data: serializedUpdatedVilla,
       },
       { status: 200 }
     );
   } catch (error) {
+    console.error(error);
+    if (error instanceof z.ZodError) {
+      const errMessage = error.issues[0].message;
+
+      return NextResponse.json<MyResponse<never>>(
+        {
+          statusCode: 400,
+          error: errMessage,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json<MyResponse<never>>(
       {
         statusCode: 500,

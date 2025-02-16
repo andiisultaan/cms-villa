@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
+import Link from "next/link";
 
 type SerializedVilla = {
   _id: string;
@@ -67,9 +68,11 @@ function VillaTable({ initialVillas }: { initialVillas: SerializedVilla[] }) {
               <TableCell>{villa.status}</TableCell>
               <TableCell>
                 <div className="flex space-x-2">
-                  <Button variant="outline" size="icon">
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <Link href={`/edit-villa/${villa._id}`}>
+                    <Button variant="outline" size="icon">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </Link>
                   <Button variant="outline" size="icon" onClick={() => handleDelete(villa._id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
