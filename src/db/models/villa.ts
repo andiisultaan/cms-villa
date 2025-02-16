@@ -1,5 +1,5 @@
 import { getMongoClientInstance } from "../config";
-import { ObjectId, Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export type VillaModel = {
   _id: ObjectId;
@@ -10,6 +10,8 @@ export type VillaModel = {
   status: "available" | "booked" | "maintenance";
   images: Array<{ url: string; publicId: string }>;
 };
+
+export type SerializedVillaModel = Omit<VillaModel, "_id"> & { _id: string };
 
 export type VillaModelCreateInput = Omit<VillaModel, "_id">;
 
@@ -30,6 +32,11 @@ export const getVillas = async () => {
 
   return villas;
 };
+
+export const serializeVilla = (villa: VillaModel): SerializedVillaModel => ({
+  ...villa,
+  _id: villa._id.toString(),
+});
 
 export const createVilla = async (villa: VillaModelCreateInput) => {
   const db = await getDb();

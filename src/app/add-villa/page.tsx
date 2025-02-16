@@ -115,7 +115,7 @@ export default function AddVilla() {
         toast.success("Successfully added new villa!", {
           description: "Redirecting you to the dashboard page...",
         });
-        router.push("/");
+        setTimeout(() => router.push("/"), 2000);
       } else {
         toast.error(data.error || "Failed to add villa", {
           description: "Please check your information and try again.",
@@ -136,7 +136,7 @@ export default function AddVilla() {
         <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">Add New Villa</CardTitle>
+              <CardTitle className="text-2xl font-bold">Add New Villa 🏡</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={addVilla} className="space-y-6">

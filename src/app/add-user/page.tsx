@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navigation from "@/components/navigation";
 import { toast, Toaster } from "sonner";
 import { handleAddUser } from "./action";
+import { UserPlusIcon } from "lucide-react";
 
 interface FormData {
   username: string;

@@ -1,50 +1,11 @@
 import { Suspense } from "react";
 import Navigation from "@/components/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
 import { getVillas } from "@/db/models/villa";
-
-async function VillaTable() {
-  const villas = await getVillas();
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead>Price per Night</TableHead>
-          <TableHead>Capacity</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Action</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {villas.map(villa => (
-          <TableRow key={villa._id.toString()}>
-            <TableCell>{villa.name}</TableCell>
-            <TableCell>{villa.description}</TableCell>
-            <TableCell>${villa.price}</TableCell>
-            <TableCell>{villa.capacity}</TableCell>
-            <TableCell>{villa.status}</TableCell>
-            <TableCell>
-              <div className="flex space-x-2">
-                <Button variant="outline" size="icon">
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+import VillaTable from "@/components/VillaTable";
+import { Toaster } from "sonner";
+import { DashboardStatsSkeleton } from "@/components/DashboardStatsSkeleton";
+import { VillaTableSkeleton } from "@/components/VillaTableSkeleton";
 
 async function DashboardStats() {
   const villas = await getVillas();
@@ -73,15 +34,23 @@ async function DashboardStats() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const villasData = await getVillas();
+
+  const serializedVillas = villasData.map(villa => ({
+    ...villa,
+    _id: villa._id.toString(), // Convert ObjectId to string
+  }));
+
   return (
     <div className="flex h-screen bg-gray-100">
+      <Toaster richColors />
       <Navigation />
       <main className="flex-1 overflow-y-auto p-8">
         <div className="space-y-8">
           <h1 className="text-3xl font-bold">Gonjong Harau Dashboard</h1>
 
-          <Suspense fallback={<div>Loading stats...</div>}>
+          <Suspense fallback={<DashboardStatsSkeleton />}>
             <DashboardStats />
           </Suspense>
 
@@ -90,8 +59,8 @@ export default function Home() {
               <CardTitle>Villa Data</CardTitle>
             </CardHeader>
             <CardContent>
-              <Suspense fallback={<div>Loading villas...</div>}>
-                <VillaTable />
+              <Suspense fallback={<VillaTableSkeleton />}>
+                <VillaTable initialVillas={serializedVillas} />
               </Suspense>
             </CardContent>
           </Card>
