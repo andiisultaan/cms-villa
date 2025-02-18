@@ -8,11 +8,6 @@ import { toast, Toaster } from "sonner";
 import EditVillaForm from "@/components/EditVillaForm";
 import Navigation from "@/components/navigation";
 
-// Define a new interface that extends SerializedVillaModel with newImages
-interface UpdateVillaData extends Partial<SerializedVillaModel> {
-  newImages?: File[];
-}
-
 export default function EditVilla() {
   const [villa, setVilla] = useState<SerializedVillaModel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,27 +33,39 @@ export default function EditVilla() {
     fetchVilla();
   }, [id]);
 
-  const handleUpdateVilla = async (updatedData: UpdateVillaData) => {
+  const handleUpdateVilla = async (updatedData: SerializedVillaModel) => {
     try {
       const formData = new FormData();
 
       // Append text fields
       Object.entries(updatedData).forEach(([key, value]) => {
-        if (key !== "images" && key !== "newImages" && value !== undefined) {
+        if (key !== "images" && value !== undefined) {
           formData.append(key, value.toString());
         }
       });
 
       // Handle images
-      if (updatedData.newImages && updatedData.newImages.length > 0) {
-        // If there are new images, append them to existing images
-        updatedData.newImages.forEach((file: File) => {
-          formData.append("images", file);
-        });
-      } else if (villa?.images) {
-        // If no new images, keep the existing ones
-        formData.append("images", JSON.stringify(villa.images));
-      }
+      const existingImages = updatedData.images.filter(img => !img.file);
+      const newImages = updatedData.images.filter(img => img.file);
+
+      formData.append("existingImages", JSON.stringify(existingImages));
+      newImages.forEach((img, index) => {
+        if (img.file) {
+          formData.append(`newImages`, img.file);
+        }
+      });
+
+      // Append all images data as JSON
+      formData.append(
+        "imagesData",
+        JSON.stringify(
+          updatedData.images.map(img => ({
+            url: img.url,
+            publicId: img.publicId,
+            isNew: !!img.file,
+          }))
+        )
+      );
 
       const response = await fetch(`/api/villas/${id}`, {
         method: "PUT",

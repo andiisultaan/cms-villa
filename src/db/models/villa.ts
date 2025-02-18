@@ -8,7 +8,7 @@ export type VillaModel = {
   price: string;
   capacity: string;
   status: "available" | "booked" | "maintenance";
-  images: Array<{ url: string; publicId: string }>;
+  images: Array<{ url: string; publicId?: string; file?: File }>;
 };
 
 export type SerializedVillaModel = Omit<VillaModel, "_id"> & { _id: string };

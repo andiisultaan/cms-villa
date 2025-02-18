@@ -12,14 +12,11 @@ import { X, ImagePlus } from "lucide-react";
 
 interface EditVillaFormProps {
   villa: SerializedVillaModel;
-  onSubmit: (updatedData: Partial<SerializedVillaModel> & { newImages?: File[] }) => void;
+  onSubmit: (updatedData: SerializedVillaModel) => void;
 }
 
 export default function EditVillaForm({ villa, onSubmit }: EditVillaFormProps) {
-  const [formData, setFormData] = useState<SerializedVillaModel>({
-    ...villa,
-  });
-  const [newImages, setNewImages] = useState<File[]>([]);
+  const [formData, setFormData] = useState<SerializedVillaModel>(villa);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -39,29 +36,27 @@ export default function EditVillaForm({ villa, onSubmit }: EditVillaFormProps) {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setNewImages(prevNewImages => [...prevNewImages, ...files]);
+    const newImages = files.map(file => ({
+      file,
+      url: URL.createObjectURL(file),
+    }));
+
+    setFormData(prevData => ({
+      ...prevData,
+      images: [...prevData.images, ...newImages],
+    }));
   };
 
-  const removeExistingImage = (index: number) => {
+  const removeImage = (index: number) => {
     setFormData(prevData => ({
       ...prevData,
       images: prevData.images.filter((_, i) => i !== index),
     }));
   };
 
-  const removeNewImage = (index: number) => {
-    setNewImages(prevNewImages => prevNewImages.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const updatedData: Partial<SerializedVillaModel> & { newImages?: File[] } = {
-      ...formData,
-      newImages: newImages.length > 0 ? newImages : undefined,
-    };
-
-    onSubmit(updatedData);
+    onSubmit(formData);
   };
 
   return (
@@ -113,18 +108,9 @@ export default function EditVillaForm({ villa, onSubmit }: EditVillaFormProps) {
               <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="image-upload" multiple />
 
               {formData.images.map((image, index) => (
-                <div key={`existing-${index}`} className="relative w-24 h-24">
+                <div key={index} className="relative w-24 h-24">
                   <Image src={image.url || "/placeholder.svg"} alt={`Villa image ${index + 1}`} fill className="object-cover rounded-lg" />
-                  <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => removeExistingImage(index)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-
-              {newImages.map((file, index) => (
-                <div key={`new-${index}`} className="relative w-24 h-24">
-                  <Image src={URL.createObjectURL(file) || "/placeholder.svg"} alt={`New villa image ${index + 1}`} fill className="object-cover rounded-lg" />
-                  <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => removeNewImage(index)}>
+                  <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => removeImage(index)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
