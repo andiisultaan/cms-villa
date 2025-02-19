@@ -35,13 +35,6 @@ async function DashboardStats() {
 }
 
 export default async function Home() {
-  const villasData = await getVillas();
-
-  const serializedVillas = villasData.map(villa => ({
-    ...villa,
-    _id: villa._id.toString(), // Convert ObjectId to string
-  }));
-
   return (
     <div className="flex h-screen bg-gray-100">
       <Toaster richColors />
@@ -60,7 +53,7 @@ export default async function Home() {
             </CardHeader>
             <CardContent>
               <Suspense fallback={<VillaTableSkeleton />}>
-                <VillaTable initialVillas={serializedVillas} />
+                <VillaTable />
               </Suspense>
             </CardContent>
           </Card>

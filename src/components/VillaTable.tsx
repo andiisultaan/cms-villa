@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
@@ -28,9 +28,42 @@ async function deleteVilla(id: string) {
   return response.json();
 }
 
-function VillaTable({ initialVillas }: { initialVillas: SerializedVilla[] }) {
-  const [villas, setVillas] = useState<SerializedVilla[]>(initialVillas);
+async function fetchVillas(): Promise<SerializedVilla[]> {
+  const response = await fetch("/api/villas");
+  if (!response.ok) {
+    throw new Error("Failed to fetch villas");
+  }
+  const data = await response.json();
+  return data.data;
+}
+
+function formatToIDR(price: string): string {
+  const numPrice = Number.parseFloat(price);
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(numPrice);
+}
+
+function VillaTable() {
+  const [villas, setVillas] = useState<SerializedVilla[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchVillas()
+      .then(fetchedVillas => {
+        setVillas(fetchedVillas);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error("Error fetching villas:", error);
+        toast.error("Failed to fetch villas");
+        setIsLoading(false);
+      });
+  }, []);
 
   const handleDelete = async (id: string) => {
     try {
@@ -43,6 +76,10 @@ function VillaTable({ initialVillas }: { initialVillas: SerializedVilla[] }) {
       toast.error("Failed to delete villa");
     }
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>
@@ -63,7 +100,7 @@ function VillaTable({ initialVillas }: { initialVillas: SerializedVilla[] }) {
             <TableRow key={villa._id}>
               <TableCell>{villa.name}</TableCell>
               <TableCell>{villa.description}</TableCell>
-              <TableCell>${villa.price}</TableCell>
+              <TableCell>{formatToIDR(villa.price)}</TableCell>
               <TableCell>{villa.capacity}</TableCell>
               <TableCell>{villa.status}</TableCell>
               <TableCell>
