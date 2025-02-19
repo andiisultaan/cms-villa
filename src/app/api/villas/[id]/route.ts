@@ -93,37 +93,22 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 }
 
+const imageSchema = z.union([
+  z.object({
+    url: z.string().url(),
+    publicId: z.string(),
+  }),
+  z.string(), // To handle stringified JSON
+  z.instanceof(File),
+]);
+
 const villaUpdateSchema = z.object({
-  name: z.string().min(1, { message: "Villa name is required" }).optional(),
-  description: z.string().min(1, { message: "Description is required" }).optional(),
-  price: z
-    .string()
-    .min(1, { message: "Price is required" })
-    .refine(val => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Price must be a positive number",
-    })
-    .optional(),
-  capacity: z
-    .string()
-    .min(1, { message: "Capacity is required" })
-    .refine(val => !isNaN(Number(val)) && Number.isInteger(Number(val)) && Number(val) > 0, {
-      message: "Capacity must be a positive integer",
-    })
-    .optional(),
-  status: z
-    .enum(["available", "booked", "maintenance"], {
-      errorMap: () => ({ message: "Status must be either 'available', 'booked', or 'maintenance'" }),
-    })
-    .optional(),
-  existingImages: z
-    .array(
-      z.object({
-        url: z.string().url(),
-        publicId: z.string(),
-      })
-    )
-    .optional(),
-  newImages: z.array(z.instanceof(File)).optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  price: z.union([z.number(), z.string()]).optional(),
+  capacity: z.union([z.number(), z.string()]).optional(),
+  status: z.enum(["available", "booked", "maintenance"]).optional(),
+  images: z.array(imageSchema).optional(),
 });
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -147,10 +132,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const price = formData.get("price") as string | null;
     const capacity = formData.get("capacity") as string | null;
     const status = formData.get("status") as string | null;
-    const existingImagesJson = formData.get("existingImages") as string | null;
-    const newImages = formData.getAll("newImages") as File[];
-
-    const existingImages = existingImagesJson ? JSON.parse(existingImagesJson) : [];
+    const imagesData = formData.getAll("images");
 
     const data = {
       name,
@@ -158,42 +140,59 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       price,
       capacity,
       status,
-      existingImages,
-      newImages,
+      images: imagesData.map(image => {
+        if (typeof image === "string") {
+          try {
+            return JSON.parse(image);
+          } catch {
+            return image;
+          }
+        }
+        return image;
+      }),
     };
 
-    const parsedData = villaUpdateSchema.parse(data);
+    const parsedData = villaUpdateSchema.safeParse(data);
 
-    // Process new images
-    const processedNewImages = await Promise.all(
-      (parsedData.newImages || []).map(async image => {
-        const arrayBuffer = await image.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+    if (!parsedData.success) {
+      throw parsedData.error;
+    }
 
-        // Upload to Cloudinary
-        const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-          cloudinary.uploader
-            .upload_stream({ folder: "villas" }, (error, result) => {
-              if (error) reject(error);
-              else resolve(result as UploadApiResponse);
-            })
-            .end(buffer);
-        });
+    const processedImages = await Promise.all(
+      (parsedData.data.images || []).map(async image => {
+        if (image instanceof File) {
+          const arrayBuffer = await image.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
 
-        return {
-          url: result.secure_url,
-          publicId: result.public_id,
-        };
+          const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+            cloudinary.uploader
+              .upload_stream({ folder: "villas" }, (error, result) => {
+                if (error) reject(error);
+                else resolve(result as UploadApiResponse);
+              })
+              .end(buffer);
+          });
+
+          return {
+            url: result.secure_url,
+            publicId: result.public_id,
+          };
+        } else if (typeof image === "string") {
+          // Assume this is a URL of an existing image
+          return { url: image, publicId: "" };
+        } else {
+          // This is an existing image object
+          return image;
+        }
       })
     );
 
-    // Combine existing and new images
-    const allImages = [...(parsedData.existingImages || []), ...processedNewImages];
-
     // Update villa data
     const updatedVillaData = {
-      ...parsedData,
-      images: allImages,
+      ...parsedData.data,
+      price: parsedData.data.price?.toString(),
+      capacity: parsedData.data.capacity?.toString(),
+      images: processedImages as { url: string; publicId?: string | undefined; file?: File | undefined }[],
     };
 
     const result = await updateVilla(id, updatedVillaData);
@@ -222,7 +221,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   } catch (error) {
     console.error(error);
     if (error instanceof z.ZodError) {
-      const errMessage = error.issues[0].message;
+      const errMessage = error.errors.map(e => e.message).join(", ");
 
       return NextResponse.json<MyResponse<never>>(
         {

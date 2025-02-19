@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
-import type { SerializedVillaModel } from "@/db/models/villa";
 import { toast, Toaster } from "sonner";
 import EditVillaForm from "@/components/EditVillaForm";
 import Navigation from "@/components/navigation";
+import type { SerializedVillaModel } from "@/db/models/villa";
 
 export default function EditVilla() {
   const [villa, setVilla] = useState<SerializedVillaModel | null>(null);
@@ -33,7 +33,7 @@ export default function EditVilla() {
     fetchVilla();
   }, [id]);
 
-  const handleUpdateVilla = async (updatedData: SerializedVillaModel) => {
+  const handleUpdateVilla = async (updatedData: Partial<SerializedVillaModel>) => {
     try {
       const formData = new FormData();
 
@@ -45,27 +45,21 @@ export default function EditVilla() {
       });
 
       // Handle images
-      const existingImages = updatedData.images.filter(img => !img.file);
-      const newImages = updatedData.images.filter(img => img.file);
-
-      formData.append("existingImages", JSON.stringify(existingImages));
-      newImages.forEach((img, index) => {
-        if (img.file) {
-          formData.append(`newImages`, img.file);
-        }
-      });
-
-      // Append all images data as JSON
-      formData.append(
-        "imagesData",
-        JSON.stringify(
-          updatedData.images.map(img => ({
-            url: img.url,
-            publicId: img.publicId,
-            isNew: !!img.file,
-          }))
-        )
-      );
+      if (updatedData.images) {
+        updatedData.images.forEach((img, index) => {
+          if (img.file instanceof File) {
+            formData.append(`images`, img.file);
+          } else if (img.url) {
+            // For existing images, we send the URL and publicId
+            formData.append(`images`, JSON.stringify({ url: img.url, publicId: img.publicId }));
+          }
+        });
+      } else if (villa && villa.images) {
+        // If no new images were added, keep the existing ones
+        villa.images.forEach(img => {
+          formData.append(`images`, JSON.stringify({ url: img.url, publicId: img.publicId }));
+        });
+      }
 
       const response = await fetch(`/api/villas/${id}`, {
         method: "PUT",
