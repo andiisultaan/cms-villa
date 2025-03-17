@@ -31,6 +31,17 @@ export const GET = async () => {
   );
 };
 
+const facilitiesSchema = z.object({
+  bathroom: z.boolean().default(false),
+  wifi: z.boolean().default(false),
+  bed: z.boolean().default(false),
+  parking: z.boolean().default(false),
+  kitchen: z.boolean().default(false),
+  ac: z.boolean().default(false),
+  tv: z.boolean().default(false),
+  pool: z.boolean().default(false),
+});
+
 const villaInputSchema = z.object({
   name: z.string().min(1, { message: "Villa name is required" }),
   description: z.string().min(1, { message: "Description is required" }),
@@ -50,6 +61,7 @@ const villaInputSchema = z.object({
     errorMap: () => ({ message: "Status must be either 'available', 'booked', or 'maintenance'" }),
   }),
   images: z.array(z.instanceof(File)).min(1, { message: "At least one image is required" }),
+  facilities: facilitiesSchema.optional(),
 });
 
 // Add villa
@@ -76,7 +88,18 @@ export const POST = async (req: NextRequest) => {
     const status = formData.get("status") as string;
     const images = formData.getAll("images") as File[];
 
-    const data = { name, description, price, capacity, status, images };
+    // Parse facilities from JSON string
+    let facilities = {};
+    const facilitiesData = formData.get("facilities");
+    if (facilitiesData) {
+      try {
+        facilities = JSON.parse(facilitiesData as string);
+      } catch (error) {
+        console.error("Error parsing facilities:", error);
+      }
+    }
+
+    const data = { name, description, price, capacity, status, images, facilities };
 
     const parsedData = villaInputSchema.safeParse(data);
 

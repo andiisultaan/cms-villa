@@ -1,5 +1,7 @@
 "use client";
 
+import type React from "react";
+
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -20,6 +22,16 @@ interface VillaFormData {
   capacity: string;
   status: string;
   images: File[];
+  facilities: {
+    bathroom: boolean;
+    wifi: boolean;
+    bed: boolean;
+    parking: boolean;
+    kitchen: boolean;
+    ac: boolean;
+    tv: boolean;
+    pool: boolean;
+  };
 }
 
 export default function AddVilla() {
@@ -30,6 +42,16 @@ export default function AddVilla() {
     capacity: "",
     status: "available",
     images: [],
+    facilities: {
+      bathroom: false,
+      wifi: false,
+      bed: false,
+      parking: false,
+      kitchen: false,
+      ac: false,
+      tv: false,
+      pool: false,
+    },
   });
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +109,16 @@ export default function AddVilla() {
     setPreviewUrls(prevUrls => prevUrls.filter((_, i) => i !== index));
   };
 
+  const handleFacilityChange = (facility: string) => {
+    setFormData(prevData => ({
+      ...prevData,
+      facilities: {
+        ...prevData.facilities,
+        [facility]: !prevData.facilities[facility as keyof typeof prevData.facilities],
+      },
+    }));
+  };
+
   async function addVilla(e: React.FormEvent) {
     e.preventDefault();
     const formDataToSend = new FormData();
@@ -97,6 +129,9 @@ export default function AddVilla() {
     formDataToSend.append("price", formData.price);
     formDataToSend.append("capacity", formData.capacity);
     formDataToSend.append("status", formData.status);
+
+    // Append facilities as JSON
+    formDataToSend.append("facilities", JSON.stringify(formData.facilities));
 
     // Append all images
     formData.images.forEach((image, index) => {
@@ -174,6 +209,67 @@ export default function AddVilla() {
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Facilities</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="bathroom" checked={formData.facilities.bathroom} onChange={() => handleFacilityChange("bathroom")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="bathroom" className="cursor-pointer">
+                        Bathroom
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="wifi" checked={formData.facilities.wifi} onChange={() => handleFacilityChange("wifi")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="wifi" className="cursor-pointer">
+                        WiFi
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="bed" checked={formData.facilities.bed} onChange={() => handleFacilityChange("bed")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="bed" className="cursor-pointer">
+                        Bed
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="parking" checked={formData.facilities.parking} onChange={() => handleFacilityChange("parking")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="parking" className="cursor-pointer">
+                        Parking
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="kitchen" checked={formData.facilities.kitchen} onChange={() => handleFacilityChange("kitchen")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="kitchen" className="cursor-pointer">
+                        Kitchen
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="ac" checked={formData.facilities.ac} onChange={() => handleFacilityChange("ac")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="ac" className="cursor-pointer">
+                        AC
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="tv" checked={formData.facilities.tv} onChange={() => handleFacilityChange("tv")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="tv" className="cursor-pointer">
+                        TV
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="pool" checked={formData.facilities.pool} onChange={() => handleFacilityChange("pool")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <Label htmlFor="pool" className="cursor-pointer">
+                        Pool
+                      </Label>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
