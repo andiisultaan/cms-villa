@@ -6,7 +6,11 @@ import { signToken } from "@/lib/jwt";
 import { cookies } from "next/headers";
 import { z } from "zod";
 
-export const handleLogin = async (formData: FormData) => {
+// Define the return type for better type safety
+type LoginResult = { error: string; success?: undefined } | { success: string; error?: undefined };
+
+// Update the function signature to accept prevState
+export const handleLogin = async (prevState: LoginResult | null, formData: FormData): Promise<LoginResult> => {
   const loginInputSchema = z.object({
     username: z.string().min(1, { message: "Username is required" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),
