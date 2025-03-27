@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import Link from "next/link";
 

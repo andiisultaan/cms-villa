@@ -61,6 +61,7 @@ export default function AddUser() {
         });
       }
     } catch (error) {
+      console.error(error);
       toast.error("Failed to add user", {
         description: "Please check your information and try again.",
       });
