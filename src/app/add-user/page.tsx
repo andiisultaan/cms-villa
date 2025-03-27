@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navigation from "@/components/navigation";
 import { toast, Toaster } from "sonner";
 import { handleAddUser } from "./action";
-import { UserPlusIcon } from "lucide-react";
 
 interface FormData {
   username: string;
@@ -62,8 +61,8 @@ export default function AddUser() {
         });
       }
     } catch (error) {
-      toast.error("An unexpected error occurred", {
-        description: "Please try again later.",
+      toast.error("Failed to add user", {
+        description: "Please check your information and try again.",
       });
     }
   }

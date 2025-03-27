@@ -11,11 +11,6 @@ type MyResponse<T> = {
   error?: string;
 };
 
-type CloudinaryResult = {
-  secure_url: string;
-  public_id: string;
-};
-
 // GET Villas
 export const GET = async () => {
   const villas = await getVillas();

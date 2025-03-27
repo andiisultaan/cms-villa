@@ -24,6 +24,7 @@ export default function EditVilla() {
         const data = await response.json();
         setVilla(data.data);
       } catch (error) {
+        console.log(error);
         toast.error("Failed to fetch villa data");
       } finally {
         setLoading(false);
@@ -46,7 +47,7 @@ export default function EditVilla() {
 
       // Handle images
       if (updatedData.images) {
-        updatedData.images.forEach((img, index) => {
+        updatedData.images.forEach(img => {
           if (img.file instanceof File) {
             formData.append(`images`, img.file);
           } else if (img.url) {

@@ -56,7 +56,6 @@ function formatDate(dateString: string): string {
 function ReservationsTable() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     fetchReservations()

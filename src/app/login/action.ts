@@ -6,9 +6,7 @@ import { signToken } from "@/lib/jwt";
 import { cookies } from "next/headers";
 import { z } from "zod";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
-export const handleLogin = async (prevState: any, formData: FormData) => {
+export const handleLogin = async (formData: FormData) => {
   const loginInputSchema = z.object({
     username: z.string().min(1, { message: "Username is required" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),

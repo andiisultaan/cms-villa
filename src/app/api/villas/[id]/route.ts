@@ -48,6 +48,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       { status: 200 }
     );
   } catch (error) {
+    console.log(error);
     return NextResponse.json<MyResponse<never>>(
       {
         statusCode: 500,
@@ -83,6 +84,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       { status: 200 }
     );
   } catch (error) {
+    console.log(error);
     return NextResponse.json<MyResponse<never>>(
       {
         statusCode: 500,

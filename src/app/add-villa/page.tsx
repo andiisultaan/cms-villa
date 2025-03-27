@@ -134,7 +134,7 @@ export default function AddVilla() {
     formDataToSend.append("facilities", JSON.stringify(formData.facilities));
 
     // Append all images
-    formData.images.forEach((image, index) => {
+    formData.images.forEach(image => {
       formDataToSend.append(`images`, image);
     });
 
@@ -157,6 +157,7 @@ export default function AddVilla() {
         });
       }
     } catch (error) {
+      console.log(error);
       toast.error("An unexpected error occurred", {
         description: "Please try again later.",
       });

@@ -28,6 +28,7 @@ const middleware = async (request: NextRequest) => {
   try {
     tokenData = await verifyTokenJose<{ id: string; username: string }>(token.value);
   } catch (error) {
+    console.log(error);
     return NextResponse.redirect(loginUrl);
   }
 

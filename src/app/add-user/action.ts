@@ -1,5 +1,11 @@
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
+interface FormData {
+  username: string;
+  password: string;
+  role: string;
+}
+
 type MyResponse<T> = {
   statusCode: number;
   message?: string;
@@ -7,7 +13,7 @@ type MyResponse<T> = {
   error?: string;
 };
 
-export async function handleAddUser(formData: { [key: string]: any }) {
+export async function handleAddUser(formData: FormData) {
   const res = await fetch(`${BASE_URL}/api/users`, {
     method: "POST",
     headers: {
