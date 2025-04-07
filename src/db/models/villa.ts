@@ -8,6 +8,17 @@ export type VillaModel = {
   price: string;
   capacity: string;
   status: "available" | "booked" | "maintenance";
+  owner: string;
+  facilities: {
+    bathroom: boolean;
+    wifi: boolean;
+    bed: boolean;
+    parking: boolean;
+    kitchen: boolean;
+    ac: boolean;
+    tv: boolean;
+    pool: boolean;
+  };
   images: Array<{ url: string; publicId?: string; file?: File }>;
 };
 

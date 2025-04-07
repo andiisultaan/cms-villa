@@ -104,12 +104,27 @@ const imageSchema = z.union([
   z.instanceof(File),
 ]);
 
+const facilitiesSchema = z
+  .object({
+    bathroom: z.boolean().default(false),
+    wifi: z.boolean().default(false),
+    bed: z.boolean().default(false),
+    parking: z.boolean().default(false),
+    kitchen: z.boolean().default(false),
+    ac: z.boolean().default(false),
+    tv: z.boolean().default(false),
+    pool: z.boolean().default(false),
+  })
+  .optional();
+
 const villaUpdateSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   price: z.union([z.number(), z.string()]).optional(),
   capacity: z.union([z.number(), z.string()]).optional(),
   status: z.enum(["available", "booked", "maintenance"]).optional(),
+  owner: z.string().optional(),
+  facilities: facilitiesSchema,
   images: z.array(imageSchema).optional(),
 });
 
@@ -134,7 +149,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const price = formData.get("price") as string | null;
     const capacity = formData.get("capacity") as string | null;
     const status = formData.get("status") as string | null;
+    const owner = formData.get("owner") as string | null;
     const imagesData = formData.getAll("images");
+
+    // Parse facilities from JSON string
+    let facilities = {};
+    const facilitiesData = formData.get("facilities");
+    if (facilitiesData) {
+      try {
+        facilities = JSON.parse(facilitiesData as string);
+      } catch (error) {
+        console.error("Error parsing facilities:", error);
+      }
+    }
 
     const data = {
       name,
@@ -142,6 +169,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       price,
       capacity,
       status,
+      owner,
+      facilities,
       images: imagesData.map(image => {
         if (typeof image === "string") {
           try {
@@ -194,6 +223,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       ...parsedData.data,
       price: parsedData.data.price?.toString(),
       capacity: parsedData.data.capacity?.toString(),
+      owner: parsedData.data.owner,
+      facilities: parsedData.data.facilities,
       images: processedImages as { url: string; publicId?: string | undefined; file?: File | undefined }[],
     };
 

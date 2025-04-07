@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, X, Loader2 } from "lucide-react";
 import Navigation from "@/components/navigation";
 import { toast, Toaster } from "sonner";
 
@@ -21,6 +21,7 @@ interface VillaFormData {
   price: string;
   capacity: string;
   status: string;
+  owner: string;
   images: File[];
   facilities: {
     bathroom: boolean;
@@ -34,6 +35,12 @@ interface VillaFormData {
   };
 }
 
+interface User {
+  _id: string;
+  username: string;
+  role: string;
+}
+
 export default function AddVilla() {
   const [formData, setFormData] = useState<VillaFormData>({
     name: "",
@@ -41,6 +48,7 @@ export default function AddVilla() {
     price: "",
     capacity: "",
     status: "available",
+    owner: "",
     images: [],
     facilities: {
       bathroom: false,
@@ -56,6 +64,55 @@ export default function AddVilla() {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      // Try to fetch only owners if the API supports filtering
+      const response = await fetch("/api/users?role=owner");
+      if (response.ok) {
+        const data = await response.json();
+
+        // Process the response data
+        let usersList: User[] = [];
+
+        if (Array.isArray(data)) {
+          usersList = data;
+        } else if (data && Array.isArray(data.users)) {
+          usersList = data.users;
+        } else if (data && Array.isArray(data.data)) {
+          usersList = data.data;
+        } else {
+          console.error("Unexpected API response format:", data);
+          toast.error("Invalid user data format received");
+          setUsers([]);
+          return;
+        }
+
+        // Filter users to only include those with the owner role
+        // This is a fallback in case the API doesn't support filtering
+        const ownerUsers = usersList.filter(user => user.role === "owner");
+
+        if (ownerUsers.length === 0) {
+          toast.warning("No users with owner role found");
+        }
+
+        setUsers(ownerUsers);
+      } else {
+        toast.error("Failed to fetch users");
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("An error occurred while fetching users");
+      setUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -119,8 +176,19 @@ export default function AddVilla() {
     }));
   };
 
+  const handleOwnerChange = (value: string) => {
+    setFormData(prevData => ({
+      ...prevData,
+      owner: value,
+    }));
+  };
+
   async function addVilla(e: React.FormEvent) {
     e.preventDefault();
+
+    // Set loading state
+    setIsSubmitting(true);
+
     const formDataToSend = new FormData();
 
     // Append all form fields
@@ -129,6 +197,7 @@ export default function AddVilla() {
     formDataToSend.append("price", formData.price);
     formDataToSend.append("capacity", formData.capacity);
     formDataToSend.append("status", formData.status);
+    formDataToSend.append("owner", formData.owner);
 
     // Append facilities as JSON
     formDataToSend.append("facilities", JSON.stringify(formData.facilities));
@@ -155,12 +224,16 @@ export default function AddVilla() {
         toast.error(data.error || "Failed to add villa", {
           description: "Please check your information and try again.",
         });
+        // Reset loading state on error
+        setIsSubmitting(false);
       }
     } catch (error) {
       console.log(error);
       toast.error("An unexpected error occurred", {
         description: "Please try again later.",
       });
+      // Reset loading state on error
+      setIsSubmitting(false);
     }
   }
 
@@ -178,29 +251,29 @@ export default function AddVilla() {
               <form onSubmit={addVilla} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">Villa Name</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
+                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required disabled={isSubmitting} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" name="description" value={formData.description} onChange={handleChange} required className="min-h-[100px]" />
+                  <Textarea id="description" name="description" value={formData.description} onChange={handleChange} required className="min-h-[100px]" disabled={isSubmitting} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="price">Price per Night</Label>
-                    <Input id="price" name="price" type="number" value={formData.price} onChange={handleChange} required min="0" />
+                    <Input id="price" name="price" type="number" value={formData.price} onChange={handleChange} required min="0" disabled={isSubmitting} />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="capacity">Capacity</Label>
-                    <Input id="capacity" name="capacity" type="number" value={formData.capacity} onChange={handleChange} required min="1" />
+                    <Input id="capacity" name="capacity" type="number" value={formData.capacity} onChange={handleChange} required min="1" disabled={isSubmitting} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={handleStatusChange}>
+                  <Select value={formData.status} onValueChange={handleStatusChange} disabled={isSubmitting}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
@@ -213,59 +286,88 @@ export default function AddVilla() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="owner">Owner</Label>
+                  <Select value={formData.owner} onValueChange={handleOwnerChange} disabled={isSubmitting}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select owner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.isArray(users) && users.length > 0 ? (
+                        users.map(user => (
+                          <SelectItem key={user._id} value={user.username}>
+                            {user.username}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-users" disabled>
+                          No owners available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Facilities</Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="bathroom" checked={formData.facilities.bathroom} onChange={() => handleFacilityChange("bathroom")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input
+                        type="checkbox"
+                        id="bathroom"
+                        checked={formData.facilities.bathroom}
+                        onChange={() => handleFacilityChange("bathroom")}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                        disabled={isSubmitting}
+                      />
                       <Label htmlFor="bathroom" className="cursor-pointer">
                         Bathroom
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="wifi" checked={formData.facilities.wifi} onChange={() => handleFacilityChange("wifi")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="wifi" checked={formData.facilities.wifi} onChange={() => handleFacilityChange("wifi")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="wifi" className="cursor-pointer">
                         WiFi
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="bed" checked={formData.facilities.bed} onChange={() => handleFacilityChange("bed")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="bed" checked={formData.facilities.bed} onChange={() => handleFacilityChange("bed")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="bed" className="cursor-pointer">
                         Bed
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="parking" checked={formData.facilities.parking} onChange={() => handleFacilityChange("parking")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="parking" checked={formData.facilities.parking} onChange={() => handleFacilityChange("parking")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="parking" className="cursor-pointer">
                         Parking
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="kitchen" checked={formData.facilities.kitchen} onChange={() => handleFacilityChange("kitchen")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="kitchen" checked={formData.facilities.kitchen} onChange={() => handleFacilityChange("kitchen")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="kitchen" className="cursor-pointer">
                         Kitchen
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="ac" checked={formData.facilities.ac} onChange={() => handleFacilityChange("ac")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="ac" checked={formData.facilities.ac} onChange={() => handleFacilityChange("ac")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="ac" className="cursor-pointer">
                         AC
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="tv" checked={formData.facilities.tv} onChange={() => handleFacilityChange("tv")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="tv" checked={formData.facilities.tv} onChange={() => handleFacilityChange("tv")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="tv" className="cursor-pointer">
                         TV
                       </Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="pool" checked={formData.facilities.pool} onChange={() => handleFacilityChange("pool")} className="rounded border-gray-300 text-primary focus:ring-primary" />
+                      <input type="checkbox" id="pool" checked={formData.facilities.pool} onChange={() => handleFacilityChange("pool")} className="rounded border-gray-300 text-primary focus:ring-primary" disabled={isSubmitting} />
                       <Label htmlFor="pool" className="cursor-pointer">
                         Pool
                       </Label>
@@ -276,18 +378,21 @@ export default function AddVilla() {
                 <div className="space-y-2">
                   <Label>Villa Images</Label>
                   <div className="flex flex-wrap items-center gap-4">
-                    <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="image-upload" multiple />
+                    <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" id="image-upload" multiple disabled={isSubmitting} />
 
                     {previewUrls.map((url, index) => (
                       <div key={index} className="relative w-24 h-24">
                         <Image src={url || "/placeholder.svg"} alt={`Villa preview ${index + 1}`} fill className="object-cover rounded-lg" />
-                        <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => removeImage(index)}>
+                        <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => removeImage(index)} disabled={isSubmitting}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
 
-                    <Label htmlFor="image-upload" className="w-24 h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <Label
+                      htmlFor="image-upload"
+                      className={`w-24 h-24 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg hover:bg-gray-50 cursor-pointer ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
                       <ImagePlus className="h-8 w-8 text-gray-400" />
                       <span className="text-xs text-gray-600 text-center">Upload Images</span>
                     </Label>
@@ -299,8 +404,15 @@ export default function AddVilla() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full">
-                  Add Villa
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding Villa...
+                    </>
+                  ) : (
+                    "Add Villa"
+                  )}
                 </Button>
               </form>
             </CardContent>

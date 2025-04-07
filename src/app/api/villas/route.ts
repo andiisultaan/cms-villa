@@ -1,7 +1,7 @@
 import { createVilla, getVillas } from "@/db/models/villa";
 import cloudinary from "@/lib/cloudinary";
-import { NextRequest, NextResponse } from "next/server";
-import { UploadApiResponse } from "cloudinary";
+import { type NextRequest, NextResponse } from "next/server";
+import type { UploadApiResponse } from "cloudinary";
 import { z } from "zod";
 
 type MyResponse<T> = {
@@ -55,6 +55,7 @@ const villaInputSchema = z.object({
   status: z.enum(["available", "booked", "maintenance"], {
     errorMap: () => ({ message: "Status must be either 'available', 'booked', or 'maintenance'" }),
   }),
+  owner: z.string().min(1, { message: "Owner is required" }),
   images: z.array(z.instanceof(File)).min(1, { message: "At least one image is required" }),
   facilities: facilitiesSchema.optional(),
 });
@@ -81,20 +82,41 @@ export const POST = async (req: NextRequest) => {
     const price = formData.get("price") as string;
     const capacity = formData.get("capacity") as string;
     const status = formData.get("status") as string;
+    const owner = formData.get("owner") as string;
     const images = formData.getAll("images") as File[];
 
     // Parse facilities from JSON string
-    let facilities = {};
+    let facilities = facilitiesSchema.parse({
+      bathroom: false,
+      wifi: false,
+      bed: false,
+      parking: false,
+      kitchen: false,
+      ac: false,
+      tv: false,
+      pool: false,
+    });
+
     const facilitiesData = formData.get("facilities");
     if (facilitiesData) {
       try {
-        facilities = JSON.parse(facilitiesData as string);
+        const parsedFacilities = JSON.parse(facilitiesData as string);
+        facilities = facilitiesSchema.parse(parsedFacilities);
       } catch (error) {
         console.error("Error parsing facilities:", error);
       }
     }
 
-    const data = { name, description, price, capacity, status, images, facilities };
+    const data = {
+      name,
+      description,
+      price,
+      capacity,
+      status,
+      owner,
+      images,
+      facilities,
+    };
 
     const parsedData = villaInputSchema.safeParse(data);
 
@@ -125,10 +147,16 @@ export const POST = async (req: NextRequest) => {
       })
     );
 
-    // Create villa with Cloudinary image URLs
+    // Create villa with Cloudinary image URLs and owner
     const villa = await createVilla({
-      ...parsedData.data,
-      images: processedImages,
+      name: parsedData.data.name,
+      description: parsedData.data.description,
+      price: parsedData.data.price,
+      capacity: parsedData.data.capacity,
+      status: parsedData.data.status,
+      owner: parsedData.data.owner,
+      facilities: facilities, // Use the properly parsed facilities
+      images: processedImages, // Use the processed images
     });
 
     return NextResponse.json<MyResponse<unknown>>(

@@ -40,10 +40,26 @@ export default function EditVilla() {
 
       // Append text fields
       Object.entries(updatedData).forEach(([key, value]) => {
-        if (key !== "images" && value !== undefined) {
+        if (key !== "images" && key !== "facilities" && value !== undefined) {
           formData.append(key, value.toString());
         }
       });
+
+      // Handle facilities - convert to JSON string
+      if (updatedData.facilities) {
+        formData.append("facilities", JSON.stringify(updatedData.facilities));
+      } else if (villa && villa.facilities) {
+        // If no new facilities were provided, keep the existing ones
+        formData.append("facilities", JSON.stringify(villa.facilities));
+      }
+
+      // Handle owner
+      if (updatedData.owner) {
+        formData.append("owner", updatedData.owner.toString());
+      } else if (villa && villa.owner) {
+        // If no new owner was provided, keep the existing one
+        formData.append("owner", villa.owner.toString());
+      }
 
       // Handle images
       if (updatedData.images) {
@@ -61,6 +77,11 @@ export default function EditVilla() {
           formData.append(`images`, JSON.stringify({ url: img.url, publicId: img.publicId }));
         });
       }
+
+      // For debugging - log the form data
+      // for (let [key, value] of formData.entries()) {
+      //   console.log(`${key}: ${value}`);
+      // }
 
       const response = await fetch(`/api/villas/${id}`, {
         method: "PUT",

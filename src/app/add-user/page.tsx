@@ -97,6 +97,7 @@ export default function AddUser() {
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="owner">Owner</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

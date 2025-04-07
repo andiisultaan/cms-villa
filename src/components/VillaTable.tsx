@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import Link from "next/link";
@@ -50,6 +50,7 @@ function formatToIDR(price: string): string {
 function VillaTable() {
   const [villas, setVillas] = useState<SerializedVilla[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -67,6 +68,7 @@ function VillaTable() {
 
   const handleDelete = async (id: string) => {
     try {
+      setDeletingId(id); // Set the ID of the villa being deleted
       await deleteVilla(id);
       setVillas(villas.filter(villa => villa._id !== id));
       router.refresh(); // Refresh the page to update the stats
@@ -74,11 +76,18 @@ function VillaTable() {
     } catch (error) {
       console.error("Error deleting villa:", error);
       toast.error("Failed to delete villa");
+    } finally {
+      setDeletingId(null); // Reset the deleting ID regardless of success or failure
     }
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center h-40">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading villas...</span>
+      </div>
+    );
   }
 
   return (
@@ -106,12 +115,17 @@ function VillaTable() {
               <TableCell>
                 <div className="flex space-x-2">
                   <Link href={`/edit-villa/${villa._id}`}>
-                    <Button variant="outline" size="icon">
+                    <Button variant="outline" size="icon" disabled={deletingId === villa._id}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <Button variant="outline" size="icon" onClick={() => handleDelete(villa._id)}>
-                    <Trash2 className="h-4 w-4" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleDelete(villa._id)}
+                    disabled={deletingId !== null} // Disable all delete buttons when any deletion is in progress
+                  >
+                    {deletingId === villa._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 </div>
               </TableCell>

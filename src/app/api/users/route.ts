@@ -27,7 +27,7 @@ export const GET = async () => {
 const userInputSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  role: z.enum(["admin", "staff"], { message: "Role must be either 'admin' or 'staff'" }),
+  role: z.enum(["admin", "staff", "owner"], { message: "Role must be either 'admin', 'staff' or 'owner'" }),
 });
 
 // add user
