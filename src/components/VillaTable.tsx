@@ -47,6 +47,23 @@ function formatToIDR(price: string): string {
   }).format(numPrice);
 }
 
+// Function to truncate text to a specific character limit
+function truncateText(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+
+  // Try to truncate at a word boundary
+  const truncated = text.substring(0, limit);
+  const lastSpaceIndex = truncated.lastIndexOf(" ");
+
+  // If there's a space in the truncated text, cut at the last space
+  if (lastSpaceIndex > 0) {
+    return truncated.substring(0, lastSpaceIndex) + "...";
+  }
+
+  // Otherwise just truncate at the limit
+  return truncated + "...";
+}
+
 function VillaTable() {
   const [villas, setVillas] = useState<SerializedVilla[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,7 +125,7 @@ function VillaTable() {
           {villas.map(villa => (
             <TableRow key={villa._id}>
               <TableCell>{villa.name}</TableCell>
-              <TableCell>{villa.description}</TableCell>
+              <TableCell title={villa.description}>{truncateText(villa.description, 50)}</TableCell>
               <TableCell>{formatToIDR(villa.price)}</TableCell>
               <TableCell>{villa.capacity}</TableCell>
               <TableCell>{villa.status}</TableCell>
