@@ -12,7 +12,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials, req) {
         try {
           // Get the absolute URL for the API endpoint
-          const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
           // Make sure we have a complete URL
           const apiUrl = new URL("/api/login", baseUrl).toString();
