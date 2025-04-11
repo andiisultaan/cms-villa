@@ -1,12 +1,7 @@
-"use server";
+"use client";
 
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { signOut } from "next-auth/react";
 
-export const handleLogout = async () => {
-  const cookieStore = cookies();
-  cookieStore.get("token");
-  cookieStore.delete("token");
-
-  redirect("/login");
+export const handleClientLogout = () => {
+  signOut({ callbackUrl: "/login" });
 };

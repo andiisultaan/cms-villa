@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { HomeIcon, PlusCircleIcon, LogOutIcon, UserPlusIcon, CalendarIcon, Building2Icon } from "lucide-react";
-import { handleLogout } from "./utils/logout";
+import { HomeIcon, PlusCircleIcon, UserPlusIcon, CalendarIcon, Building2Icon } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import LogoutButton from "./logout-button";
 
 export default function Navigation() {
   // Use the auth hook to get the current session and user information
@@ -86,12 +86,8 @@ export default function Navigation() {
           </div>
         </div>
 
-        <form action={handleLogout}>
-          <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-600 hover:bg-red-50">
-            <LogOutIcon className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </form>
+        {/* Replace the form with the new LogoutButton component */}
+        <LogoutButton />
       </div>
     </nav>
   );
