@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Edit, Trash2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 type Book = {
   _id: string;
@@ -95,6 +96,10 @@ function BookingsTable() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Get user session and role
+  const { data: session } = useAuth();
+  const isAdmin = session?.user?.role === "admin";
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -153,7 +158,6 @@ function BookingsTable() {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        <span className="ml-2">Loadin...</span>
       </div>
     );
   }
@@ -182,13 +186,13 @@ function BookingsTable() {
             <TableHead>Order ID</TableHead>
             <TableHead>Total Price</TableHead>
             <TableHead>Payment Status</TableHead>
-            <TableHead>Action</TableHead>
+            {isAdmin && <TableHead>Action</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {bookings.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-gray-500">
                 No bookings found
               </TableCell>
             </TableRow>
@@ -214,18 +218,20 @@ function BookingsTable() {
                     {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
                   </span>
                 </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Link href={`/edit-booking/${booking._id}`}>
-                      <Button variant="outline" size="icon" disabled={deletingId === booking._id}>
-                        <Edit className="h-4 w-4" />
+                {isAdmin && (
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Link href={`/edit-booking/${booking._id}`}>
+                        <Button variant="outline" size="icon" disabled={deletingId === booking._id}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button variant="outline" size="icon" onClick={() => handleDelete(booking._id)} disabled={deletingId === booking._id} className={deletingId === booking._id ? "opacity-50 cursor-not-allowed" : ""}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </Link>
-                    <Button variant="outline" size="icon" onClick={() => handleDelete(booking._id)} disabled={deletingId === booking._id} className={deletingId === booking._id ? "opacity-50 cursor-not-allowed" : ""}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             ))
           )}

@@ -7,6 +7,7 @@ import { Edit, Trash2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 type SerializedVilla = {
   _id: string;
@@ -70,6 +71,10 @@ function VillaTable() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
+  // Get user session and role
+  const { data: session } = useAuth();
+  const isAdmin = session?.user?.role === "admin";
+
   useEffect(() => {
     fetchVillas()
       .then(fetchedVillas => {
@@ -102,7 +107,6 @@ function VillaTable() {
     return (
       <div className="flex justify-center items-center h-40">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading villas...</span>
       </div>
     );
   }
@@ -118,7 +122,7 @@ function VillaTable() {
             <TableHead>Price per Night</TableHead>
             <TableHead>Capacity</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Action</TableHead>
+            {isAdmin && <TableHead>Action</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -129,23 +133,25 @@ function VillaTable() {
               <TableCell>{formatToIDR(villa.price)}</TableCell>
               <TableCell>{villa.capacity}</TableCell>
               <TableCell>{villa.status}</TableCell>
-              <TableCell>
-                <div className="flex space-x-2">
-                  <Link href={`/edit-villa/${villa._id}`}>
-                    <Button variant="outline" size="icon" disabled={deletingId === villa._id}>
-                      <Edit className="h-4 w-4" />
+              {isAdmin && (
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Link href={`/edit-villa/${villa._id}`}>
+                      <Button variant="outline" size="icon" disabled={deletingId === villa._id}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDelete(villa._id)}
+                      disabled={deletingId !== null} // Disable all delete buttons when any deletion is in progress
+                    >
+                      {deletingId === villa._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                     </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDelete(villa._id)}
-                    disabled={deletingId !== null} // Disable all delete buttons when any deletion is in progress
-                  >
-                    {deletingId === villa._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </TableCell>
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

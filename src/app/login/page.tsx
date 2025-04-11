@@ -1,24 +1,17 @@
 "use client";
 
+import type React from "react";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { handleLogin } from "./action";
-import { useFormState, useFormStatus } from "react-dom";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Logging in..." : "Login"}
-    </Button>
-  );
-}
 
 function LoadingOverlay() {
   return (
@@ -31,44 +24,70 @@ function LoadingOverlay() {
   );
 }
 
-export default function Login() {
+export default function LoginForm() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
   const router = useRouter();
-  const [state, formAction] = useFormState(handleLogin, null);
-  const [showLoading, setShowLoading] = useState(false);
 
-  useEffect(() => {
-    if (state) {
-      if (state.error) {
-        toast.error(state.error);
-      } else if (state.success) {
-        toast.success(state.success);
-        setShowLoading(true);
-        setTimeout(() => {
-          router.push("/");
-        }, 2000); // Redirect after 2 seconds to show loading animation
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const username = formData.get("username") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const result = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        console.log(result.error);
+        toast.error("Username atau password salah");
+        setIsLoading(false);
+        return;
       }
+
+      // Show success toast and loading overlay
+      toast.success("Login berhasil");
+      setShowLoadingOverlay(true);
+
+      // Redirect after a short delay to show the loading animation
+      setTimeout(() => {
+        router.push("/");
+        router.refresh();
+      }, 2000);
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Terjadi kesalahan saat login");
+      setIsLoading(false);
     }
-  }, [state, router]);
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <Toaster richColors />
-      {showLoading && <LoadingOverlay />}
+      {showLoadingOverlay && <LoadingOverlay />}
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Gonjong Harau Administration</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
-              <Input id="username" type="text" name="username" placeholder="Enter your username" required />
+              <Input id="username" name="username" placeholder="Enter your username" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" name="password" placeholder="Enter your password" required />
+              <Input id="password" name="password" type="password" placeholder="Enter your password" required />
             </div>
-            <SubmitButton />
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Logging in..." : "Login"}
+            </Button>
           </form>
         </CardContent>
       </Card>
