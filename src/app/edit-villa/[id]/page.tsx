@@ -106,7 +106,7 @@ export default function EditVilla() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-100">
+      <div className="flex h-screen items-center justify-center bg-gray-200">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
       </div>
     );
@@ -117,7 +117,7 @@ export default function EditVilla() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-200">
       <Toaster richColors />
       <Navigation />
       <main className="flex-1 overflow-y-auto p-8">

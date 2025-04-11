@@ -298,7 +298,7 @@ export default function FinancialReportPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-100">
+      <div className="flex h-screen bg-gray-200">
         <Navigation />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="container mx-auto py-10">
@@ -339,7 +339,7 @@ export default function FinancialReportPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-200">
       <Navigation />
       <main className="flex-1 overflow-y-auto p-8">
         <div className="container mx-auto py-10">

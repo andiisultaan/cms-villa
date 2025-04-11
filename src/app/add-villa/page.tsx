@@ -238,7 +238,7 @@ export default function AddVilla() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-200">
       <Toaster richColors />
       <Navigation />
       <main className="flex-1 overflow-y-auto p-8">
