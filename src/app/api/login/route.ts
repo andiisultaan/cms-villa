@@ -8,8 +8,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { username, password } = body;
 
-    console.log(`Login attempt for username: ${username}`);
-
     // Validate input
     if (!username || !password) {
       console.log("Missing username or password");
@@ -19,22 +17,14 @@ export async function POST(request: NextRequest) {
     // Find user by username from database
     const user = await getUserByUsername(username);
 
-    // Log for debugging
-    console.log(`User found: ${user ? "Yes" : "No"}`);
-
     // If user not found
     if (!user) {
       console.log(`User not found: ${username}`);
       return NextResponse.json({ error: "Username salah" }, { status: 401 });
     }
 
-    // Log for debugging (don't log actual password in production)
-    console.log(`Stored password hash: ${user.password.substring(0, 10)}...`);
-
     // Verify password using bcryptjs
     const isPasswordValid = compareTextWithHash(password, user.password);
-
-    console.log(`Password valid: ${isPasswordValid}`);
 
     // If password is wrong
     if (!isPasswordValid) {
@@ -48,8 +38,6 @@ export async function POST(request: NextRequest) {
       username: user.username,
       role: user.role || "user", // Default role if none exists
     };
-
-    console.log(`Login successful for user: ${username}, role: ${userWithoutPassword.role}`);
 
     return NextResponse.json(userWithoutPassword);
   } catch (error) {
