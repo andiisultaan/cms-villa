@@ -221,11 +221,11 @@ function BookingsTable() {
                 {isAdmin && (
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Link href={`/edit-booking/${booking._id}`}>
+                      {/* <Link href={`/edit-booking/${booking._id}`}>
                         <Button variant="outline" size="icon" disabled={deletingId === booking._id}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                      </Link>
+                      </Link> */}
                       <Button variant="outline" size="icon" onClick={() => handleDelete(booking._id)} disabled={deletingId === booking._id} className={deletingId === booking._id ? "opacity-50 cursor-not-allowed" : ""}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
