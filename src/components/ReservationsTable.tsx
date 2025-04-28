@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Trash2, RefreshCw } from "lucide-react";
 import { toast, Toaster } from "sonner";
-import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 
 type Book = {
@@ -47,6 +46,10 @@ type Villa = {
 async function deleteBooking(id: string) {
   const response = await fetch(`/api/bookings/${id}`, {
     method: "DELETE",
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+    },
   });
   if (!response.ok) {
     throw new Error("Failed to delete booking");
@@ -55,7 +58,15 @@ async function deleteBooking(id: string) {
 }
 
 async function fetchBookings(): Promise<Book[]> {
-  const response = await fetch("/api/bookings");
+  // Add timestamp to prevent caching
+  const timestamp = new Date().getTime();
+  const response = await fetch(`/api/bookings?t=${timestamp}`, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!response.ok) {
     throw new Error("Failed to fetch bookings");
   }
@@ -64,7 +75,15 @@ async function fetchBookings(): Promise<Book[]> {
 }
 
 async function fetchVillas(): Promise<Villa[]> {
-  const response = await fetch("/api/villas");
+  // Add timestamp to prevent caching
+  const timestamp = new Date().getTime();
+  const response = await fetch(`/api/villas?t=${timestamp}`, {
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
   if (!response.ok) {
     throw new Error("Failed to fetch villas");
   }
@@ -93,37 +112,57 @@ function BookingsTable() {
   const [bookings, setBookings] = useState<Book[]>([]);
   const [villas, setVillas] = useState<Villa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get user session and role
   const { data: session } = useAuth();
   const isAdmin = session?.user?.role === "admin";
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [bookingsData, villasData] = await Promise.all([fetchBookings(), fetchVillas()]);
+  const fetchData = useCallback(async (showLoadingState = true) => {
+    if (showLoadingState) {
+      setIsRefreshing(true);
+    }
 
-        setBookings(bookingsData);
-        setVillas(villasData);
+    try {
+      const [bookingsData, villasData] = await Promise.all([fetchBookings(), fetchVillas()]);
+
+      setBookings(bookingsData);
+      setVillas(villasData);
+      if (showLoadingState) {
         setIsLoading(false);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Failed to fetch data");
-        setIsLoading(false);
+        setIsRefreshing(false);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to fetch data");
+      if (showLoadingState) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    }
+  }, []);
 
+  useEffect(() => {
     fetchData();
+
+    // Set up polling to refresh data every 30 seconds
+    pollingIntervalRef.current = setInterval(() => {
+      fetchData(false); // Don't show loading state for background refreshes
+    }, 30000);
 
     // Clean up any pending timeouts when component unmounts
     return () => {
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
-  }, []);
+  }, [fetchData]);
 
   const getVillaName = (villaId: string): string => {
     const villa = villas.find(v => v._id === villaId);
@@ -154,6 +193,10 @@ function BookingsTable() {
     }
   };
 
+  const handleRefresh = () => {
+    fetchData();
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -176,6 +219,12 @@ function BookingsTable() {
           background-color: rgba(254, 202, 202, 0.2);
         }
       `}</style>
+      <div className="flex justify-end mb-4">
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-1">
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          {isRefreshing ? "Refreshing..." : "Refresh Data"}
+        </Button>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -221,11 +270,6 @@ function BookingsTable() {
                 {isAdmin && (
                   <TableCell>
                     <div className="flex space-x-2">
-                      {/* <Link href={`/edit-booking/${booking._id}`}>
-                        <Button variant="outline" size="icon" disabled={deletingId === booking._id}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link> */}
                       <Button variant="outline" size="icon" onClick={() => handleDelete(booking._id)} disabled={deletingId === booking._id} className={deletingId === booking._id ? "opacity-50 cursor-not-allowed" : ""}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
