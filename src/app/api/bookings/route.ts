@@ -10,14 +10,18 @@ type MyResponse<T> = {
 //GET Reservations
 export const GET = async () => {
   const bookings = await getBookings();
-  return Response.json(
-    {
+  return new Response(
+    JSON.stringify({
       statusCode: 200,
       message: "Success GET /api/bookings",
       data: bookings,
-    },
+    }),
     {
       status: 200,
+      headers: {
+        "Cache-Control": "no-store", // ⬅️ penting supaya tidak cache
+        "Content-Type": "application/json",
+      },
     }
   );
 };
