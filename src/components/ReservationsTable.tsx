@@ -75,9 +75,7 @@ async function fetchBookings(): Promise<Book[]> {
 }
 
 async function fetchVillas(): Promise<Villa[]> {
-  // Add timestamp to prevent caching
-  const timestamp = new Date().getTime();
-  const response = await fetch(`/api/villas?t=${timestamp}`, {
+  const response = await fetch(`/api/villas`, {
     cache: "no-store",
     headers: {
       "Cache-Control": "no-cache",

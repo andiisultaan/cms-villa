@@ -30,7 +30,13 @@ async function deleteVilla(id: string) {
 }
 
 async function fetchVillas(): Promise<SerializedVilla[]> {
-  const response = await fetch("/api/villas");
+  const response = await fetch("/api/villas", {
+    cache: "no-store", // Disable caching
+    headers: {
+      "Cache-Control": "no-cache",
+      pagma: "no-cache",
+    },
+  });
   if (!response.ok) {
     throw new Error("Failed to fetch villas");
   }
