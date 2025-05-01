@@ -67,9 +67,8 @@ interface ApiResponse<T> {
 
 export default function FinancialReportPage() {
   // Get user from auth context with fallback for when it's undefined
-  const { data: session, status } = useAuth();
+  const { data: session } = useAuth();
   const user = session?.user;
-  console.log("Auth state:", { user, status });
 
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
