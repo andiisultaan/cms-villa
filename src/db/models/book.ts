@@ -1,5 +1,5 @@
 import { getMongoClientInstance } from "../config";
-import { ObjectId, Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 
 export type BookModel = {
   _id: ObjectId;
@@ -12,14 +12,23 @@ export type BookModel = {
   phone: string;
   orderId: string;
   paymentId: string;
-  paymentStatus: string; // Changed from 'status' to 'paymentStatus'
+  paymentStatus: string;
   amount: number;
+};
+
+// Extended type to include villa information
+export type BookModelWithVilla = BookModel & {
+  villa?: {
+    name: string;
+    [key: string]: any; // For any other villa properties
+  };
 };
 
 export type BookModelCreateInput = Omit<BookModel, "_id">;
 
 const DATABASE_NAME = process.env.MONGODB_NAME || "gonjong-harau-db";
 const COLLECTION_NAME = "Bookings";
+const VILLAS_COLLECTION = "Villas";
 
 export const getDb = async () => {
   const client = await getMongoClientInstance();
@@ -53,9 +62,36 @@ export const getBookingById = async (id: string) => {
 
 export const getBookingsByVillaId = async (villaId: string) => {
   const db = await getDb();
-  const bookings = (await db.collection(COLLECTION_NAME).find({ villaId }).toArray()) as BookModel[];
 
-  return bookings;
+  // Using aggregation to join with Villas collection
+  const bookingsWithVilla = (await db
+    .collection(COLLECTION_NAME)
+    .aggregate([
+      {
+        $match: { villaId },
+      },
+      {
+        $lookup: {
+          from: VILLAS_COLLECTION,
+          localField: "villaId",
+          foreignField: "id", // Assuming the villa ID field is "id" in Villas collection
+          as: "villaInfo",
+        },
+      },
+      {
+        $addFields: {
+          villa: { $arrayElemAt: ["$villaInfo", 0] },
+        },
+      },
+      {
+        $project: {
+          villaInfo: 0, // Remove the array field from results
+        },
+      },
+    ])
+    .toArray()) as BookModelWithVilla[];
+
+  return bookingsWithVilla;
 };
 
 export const updateBookingPaymentStatus = async (id: string, paymentStatus: string) => {

@@ -5,7 +5,7 @@ import type React from "react"; // Added import for React
 import { AuthProvider } from "@/components/auth-provider";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-export const fetchCache = "force-no-store";
+// export const fetchCache = "force-no-store";
 
 const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {

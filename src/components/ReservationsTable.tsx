@@ -46,10 +46,6 @@ type Villa = {
 async function deleteBooking(id: string) {
   const response = await fetch(`/api/bookings/${id}`, {
     method: "DELETE",
-    cache: "no-store",
-    headers: {
-      "Cache-Control": "no-cache",
-    },
   });
   if (!response.ok) {
     throw new Error("Failed to delete booking");
@@ -59,13 +55,8 @@ async function deleteBooking(id: string) {
 
 async function fetchBookings(): Promise<Book[]> {
   // Add timestamp to prevent caching
-  const timestamp = new Date().getTime();
-  const response = await fetch(`/api/bookings?t=${timestamp}`, {
-    cache: "no-store",
-    headers: {
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-    },
+  const response = await fetch(`/api/bookings`, {
+    next: { revalidate: 30 },
   });
   if (!response.ok) {
     throw new Error("Failed to fetch bookings");
@@ -76,11 +67,7 @@ async function fetchBookings(): Promise<Book[]> {
 
 async function fetchVillas(): Promise<Villa[]> {
   const response = await fetch(`/api/villas`, {
-    cache: "no-store",
-    headers: {
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-    },
+    next: { revalidate: 30 },
   });
   if (!response.ok) {
     throw new Error("Failed to fetch villas");
