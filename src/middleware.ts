@@ -60,7 +60,7 @@ export async function middleware(request: NextRequest) {
     // Check role-based access for specific routes
     if (path.startsWith("/report") && token.role !== "admin" && token.role !== "owner") {
       // Redirect to dashboard if user doesn't have access
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
     return NextResponse.next({
