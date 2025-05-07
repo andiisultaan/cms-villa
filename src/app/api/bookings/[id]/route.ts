@@ -8,6 +8,7 @@ type MyResponse<T> = {
   error?: string;
 };
 
+export const dynamic = "force-dynamic";
 // GET a single booking by ID
 export const GET = async (request: NextRequest, { params }: { params: { id: string } }) => {
   try {

@@ -11,6 +11,8 @@ type MyResponse<T> = {
   error?: string;
 };
 
+export const dynamic = "force-dynamic";
+
 // GET Villas
 export const GET = async () => {
   const villas = await getVillas();

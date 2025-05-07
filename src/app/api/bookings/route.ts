@@ -7,6 +7,8 @@ type MyResponse<T> = {
   error?: string;
 };
 
+export const dynamic = "force-dynamic";
+
 //GET Reservations
 export const GET = async () => {
   const bookings = await getBookings();
