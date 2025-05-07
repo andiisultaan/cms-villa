@@ -7,11 +7,6 @@ const nextConfig = {
   // Nonaktifkan output caching
   output: "standalone",
 
-  // Nonaktifkan ISR (Incremental Static Regeneration)
-  experimental: {
-    isrMemoryCacheSize: 0,
-  },
-
   // Nonaktifkan compression untuk meningkatkan debugging
   compress: false,
 
