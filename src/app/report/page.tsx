@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Filter, Printer, Search, Trash2 } from "lucide-react";
+import { CalendarIcon, Download, Filter, Search, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { toast, Toaster } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -67,18 +67,15 @@ interface FinancialEntry {
   visitorName: string;
   personInCharge: string;
   deposite: number;
-  booking: string;
   villa: string;
   capacity: number;
   extraBed: number;
   priceExtraBed: number;
-  free: string;
   villaPrice: number;
-  discount: number;
   ownerShare: number;
   managerShare: number;
-  moment: string;
   notes: string;
+  paymentStatus: string;
 }
 
 interface ApiResponse<T> {
@@ -110,76 +107,13 @@ export default function FinancialReportPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("all-bookings");
+  const [activeTab, setActiveTab] = useState("detailed-financial");
 
   // Financial report specific states
   const [financialData, setFinancialData] = useState<FinancialEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   const printRef = useRef<HTMLDivElement>(null);
-
-  // Handle printing with jsPDF and html2canvas
-  const handlePrint = async () => {
-    if (!printRef.current) return;
-
-    try {
-      // Show loading state or notification if needed
-      const content = printRef.current;
-      const canvas = await html2canvas(content, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true,
-        logging: false,
-        windowWidth: content.scrollWidth,
-        windowHeight: content.scrollHeight,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-
-      // Calculate dimensions
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let position = 0;
-
-      // Add image to PDF
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-
-      // If content is longer than a page, add more pages
-      const pageHeight = 295; // A4 height in mm
-
-      if (imgHeight > pageHeight) {
-        let heightLeft = imgHeight - pageHeight;
-        let pageNum = 1;
-
-        while (heightLeft > 0) {
-          position = -pageHeight * pageNum;
-          pdf.addPage();
-          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-          pageNum += 1;
-        }
-      }
-
-      // Save the PDF
-      const fileName = `Laporan_Keuangan_Villa_${date?.from ? format(date.from, "dd-MM-yyyy") : ""}_${date?.to ? format(date.to, "dd-MM-yyyy") : ""}.pdf`;
-      pdf.save(fileName);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      // Show error notification if needed
-    }
-  };
-
-  // Add this function to handle the button click
-  const onPrintClick = () => {
-    if (printRef.current) {
-      handlePrint();
-    }
-  };
 
   // Filter financial data based on search term
   const filteredFinancialData = financialData.filter(
@@ -189,22 +123,28 @@ export default function FinancialReportPage() {
   // Calculate financial totals
   const financialTotals = financialData.reduce(
     (acc, entry) => {
-      return {
-        deposite: acc.deposite + entry.deposite,
-        extraBed: acc.extraBed + entry.extraBed,
-        priceExtraBed: acc.priceExtraBed + entry.priceExtraBed,
-        villaPrice: acc.villaPrice + entry.villaPrice,
-        discount: acc.discount + entry.discount,
-        ownerShare: acc.ownerShare + entry.ownerShare,
-        managerShare: acc.managerShare + entry.managerShare,
-      };
+      // Only include entries with paid status in the totals
+      const isPaid = entry.paymentStatus === "paid";
+
+      if (isPaid) {
+        return {
+          deposite: acc.deposite + entry.deposite,
+          extraBed: acc.extraBed + entry.extraBed,
+          priceExtraBed: acc.priceExtraBed + entry.priceExtraBed,
+          villaPrice: acc.villaPrice + entry.villaPrice,
+          ownerShare: acc.ownerShare + entry.ownerShare,
+          managerShare: acc.managerShare + entry.managerShare,
+        };
+      }
+
+      // Return accumulator unchanged for unpaid entries
+      return acc;
     },
     {
       deposite: 0,
       extraBed: 0,
       priceExtraBed: 0,
       villaPrice: 0,
-      discount: 0,
       ownerShare: 0,
       managerShare: 0,
     }
@@ -215,12 +155,6 @@ export default function FinancialReportPage() {
     setFinancialData(financialData.filter(entry => entry.id !== id));
   };
 
-  // Handle exporting to Excel/CSV
-  const handleExport = () => {
-    // This would be implemented with a library like xlsx in a real application
-    alert("Export functionality would be implemented here");
-  };
-
   // Generate financial data from bookings and villas
   const generateFinancialData = (bookings: Booking[], villas: Record<string, Villa>): FinancialEntry[] => {
     return bookings.map((booking, index) => {
@@ -228,7 +162,6 @@ export default function FinancialReportPage() {
 
       // Calculate shares based on amount (60% owner, 40% manager)
       const villaPrice = booking.amount;
-      const discount = 0; // No discount info in booking data
       const ownerShare = Math.round(villaPrice * 0.6);
       const managerShare = Math.round(villaPrice * 0.4);
 
@@ -242,19 +175,16 @@ export default function FinancialReportPage() {
         dateOut: booking.checkOutDate,
         visitorName: booking.name,
         personInCharge: booking.name,
-        deposite: booking.amount, // Assuming 30% deposit
-        booking: "Online",
+        deposite: booking.amount,
         villa: villaName,
         capacity: capacity,
         extraBed: 0, // No extra bed info in booking data
         priceExtraBed: 0,
-        free: "-",
         villaPrice: villaPrice,
-        discount: discount,
         ownerShare: ownerShare,
         managerShare: managerShare,
-        moment: "Regular",
-        notes: `${booking.orderId}`,
+        notes: booking.orderId,
+        paymentStatus: booking.paymentStatus,
       };
     });
   };
@@ -381,7 +311,11 @@ export default function FinancialReportPage() {
       if (user.role === "admin") return true;
 
       // If user is owner, only show their villas
-      return user.role === "owner" && villaMap[villaId]?.owner === user.id;
+      if (user.role === "owner") {
+        return villaMap[villaId]?.owner === user.name;
+      }
+
+      return false;
     })
     .map(villaId => {
       const villaBookings = bookingsByVilla[villaId];
@@ -410,6 +344,304 @@ export default function FinancialReportPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return format(date, "dd MMM yyyy");
+  };
+
+  const handleExport = () => {
+    try {
+      // Create a new PDF document
+      const doc = new jsPDF("landscape", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15; // Increased margin for better spacing
+
+      // Add title with better styling
+      doc.setFillColor(240, 240, 240);
+      doc.rect(0, 0, pageWidth, margin * 2, "F");
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 50, 50);
+      doc.text(getReportTitle(), pageWidth / 2, margin, { align: "center" });
+
+      // Add date range with better styling
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      const dateRangeText = `Periode: ${date?.from ? format(date.from, "dd MMMM yyyy") : ""} - ${date?.to ? format(date.to, "dd MMMM yyyy") : ""}`;
+      doc.text(dateRangeText, pageWidth / 2, margin + 7, { align: "center" });
+
+      // Add summary data in a box
+      const summaryStartY = margin * 2 + 5;
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(margin, summaryStartY, pageWidth - margin * 2, 30, 3, 3, "F");
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 50, 50);
+      doc.text("Ringkasan Laporan", margin + 5, summaryStartY + 8);
+
+      // Create a 2x2 grid for summary data
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+
+      const col1X = margin + 10;
+      const col2X = pageWidth / 2;
+
+      // Row 1
+      doc.text("Total Pendapatan:", col1X, summaryStartY + 16);
+      doc.setFont("helvetica", "bold");
+      doc.text(formatCurrency(financialTotals.deposite), col1X + 40, summaryStartY + 16);
+      doc.setFont("helvetica", "normal");
+
+      doc.text("Jumlah Booking:", col2X, summaryStartY + 16);
+      doc.setFont("helvetica", "bold");
+      doc.text(summaryData.totalBookings.toString(), col2X + 40, summaryStartY + 16);
+      doc.setFont("helvetica", "normal");
+
+      // Row 2
+      doc.text("Rata-rata Nilai Booking:", col1X, summaryStartY + 24);
+      doc.setFont("helvetica", "bold");
+      doc.text(formatCurrency(summaryData.averageBookingValue), col1X + 40, summaryStartY + 24);
+      doc.setFont("helvetica", "normal");
+
+      doc.text("Tingkat Okupansi:", col2X, summaryStartY + 24);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${summaryData.occupancyRate.toFixed(1)}%`, col2X + 40, summaryStartY + 24);
+
+      // Add financial data table title
+      const tableHeaderY = summaryStartY + 40;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 50, 50);
+      doc.text("Laporan Keuangan Detail", margin, tableHeaderY);
+
+      // Add note about payment status
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 100, 100);
+      doc.text("*Hanya transaksi dengan status LUNAS yang dihitung dalam total", pageWidth - margin, tableHeaderY, {
+        align: "right",
+      });
+
+      // Define table columns with better widths
+      const tableColumns = [
+        { header: "No", dataKey: "id", width: 8 },
+        { header: "Tanggal IN", dataKey: "dateIn", width: 20 },
+        { header: "Tanggal OUT", dataKey: "dateOut", width: 20 },
+        { header: "Nama", dataKey: "visitorName", width: 30 },
+        { header: "Villa", dataKey: "villa", width: 25 },
+        { header: "Status", dataKey: "status", width: 15 },
+        { header: "Deposite", dataKey: "deposite", width: 22 },
+        { header: "Harga Villa", dataKey: "villaPrice", width: 22 },
+        { header: "60% Pemilik", dataKey: "ownerShare", width: 22 },
+        { header: "40% Pengelola", dataKey: "managerShare", width: 22 },
+        { header: "Order ID", dataKey: "notes", width: 25 },
+      ];
+
+      // Define a type for the table row data
+      type TableRowData = {
+        [key: string]: string; // Add index signature to allow string indexing
+        id: string;
+        dateIn: string;
+        dateOut: string;
+        visitorName: string;
+        villa: string;
+        status: string;
+        deposite: string;
+        villaPrice: string;
+        ownerShare: string;
+        managerShare: string;
+        notes: string;
+      };
+
+      // Format data for table
+      const tableData: TableRowData[] = filteredFinancialData.map((entry, index) => {
+        const isPaid = entry.paymentStatus === "paid";
+
+        return {
+          id: (index + 1).toString(),
+          dateIn: new Date(entry.dateIn).toLocaleDateString("id-ID"),
+          dateOut: new Date(entry.dateOut).toLocaleDateString("id-ID"),
+          visitorName: entry.visitorName,
+          villa: entry.villa,
+          status: isPaid ? "LUNAS" : "BELUM LUNAS",
+          deposite: formatCurrency(entry.deposite),
+          villaPrice: formatCurrency(entry.villaPrice),
+          ownerShare: formatCurrency(entry.ownerShare),
+          managerShare: formatCurrency(entry.managerShare),
+          notes: entry.notes,
+        };
+      });
+
+      // Calculate table start position
+      const tableStartY = tableHeaderY + 10;
+
+      // Create table headers
+      let currentY = tableStartY;
+      let currentX = margin;
+
+      // Draw table header with gradient
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(50, 50, 50);
+
+      tableColumns.forEach(column => {
+        const align = ["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey) ? "right" : "center";
+        doc.text(column.header, currentX + column.width / 2, currentY + 5, { align });
+        currentX += column.width;
+      });
+
+      // Draw table rows with alternating background
+      currentY += 8;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(70, 70, 70);
+
+      // Check if we need multiple pages
+      const rowHeight = 7;
+      const maxRowsPerPage = Math.floor((pageHeight - currentY - margin * 2) / rowHeight);
+      let currentPage = 1;
+
+      tableData.forEach((row, rowIndex) => {
+        // Add alternating row background
+        if (rowIndex % 2 === 0) {
+          doc.setFillColor(245, 245, 245);
+          doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+        }
+
+        // Check if we need a new page
+        if (rowIndex > 0 && rowIndex % maxRowsPerPage === 0) {
+          doc.addPage();
+          currentPage++;
+          currentY = margin + 15;
+
+          // Add header to new page
+          doc.setFillColor(240, 240, 240);
+          doc.rect(0, 0, pageWidth, margin * 2, "F");
+          doc.setFontSize(14);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(50, 50, 50);
+          doc.text(`${getReportTitle()} - Halaman ${currentPage}`, pageWidth / 2, margin, { align: "center" });
+
+          // Add date range
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 100, 100);
+          doc.text(dateRangeText, pageWidth / 2, margin + 7, { align: "center" });
+
+          // Redraw table header
+          doc.setFillColor(230, 230, 230);
+          doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(50, 50, 50);
+
+          currentX = margin;
+          tableColumns.forEach(column => {
+            const align = ["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey) ? "right" : "center";
+            doc.text(column.header, currentX + column.width / 2, currentY + 5, { align });
+            currentX += column.width;
+          });
+
+          currentY += 8;
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(70, 70, 70);
+        }
+
+        // Draw row
+        currentX = margin;
+        doc.setFontSize(7);
+
+        // Draw cell borders and text
+        tableColumns.forEach(column => {
+          // Draw light cell borders
+          doc.setDrawColor(220, 220, 220);
+          doc.rect(currentX, currentY, column.width, rowHeight);
+
+          // Align numbers to right, text to left or center
+          const cellValue = row[column.dataKey] || "";
+          let align = "left";
+
+          if (["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey)) {
+            align = "right";
+          } else if (["id", "status"].includes(column.dataKey)) {
+            align = "center";
+          }
+
+          // Set color for status
+          if (column.dataKey === "status") {
+            if (cellValue === "LUNAS") {
+              doc.setTextColor(0, 128, 0); // Green for paid
+            } else {
+              doc.setTextColor(200, 100, 0); // Orange for unpaid
+            }
+          }
+
+          // Calculate x position based on alignment
+          let xPos;
+          if (align === "right") {
+            xPos = currentX + column.width - 2;
+          } else if (align === "center") {
+            xPos = currentX + column.width / 2;
+          } else {
+            xPos = currentX + 2;
+          }
+
+          doc.text(cellValue.toString(), xPos, currentY + 4, { align: align as "left" | "center" | "right" | "justify" });
+
+          // Reset text color
+          doc.setTextColor(70, 70, 70);
+
+          currentX += column.width;
+        });
+
+        currentY += rowHeight;
+      });
+
+      // Add totals row with better styling
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight + 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(50, 50, 50);
+
+      // Draw totals
+      currentX = margin;
+      let totalWidth = 0;
+
+      // Skip columns for totals
+      for (let i = 0; i < 6; i++) {
+        totalWidth += tableColumns[i].width;
+      }
+
+      doc.text("TOTAL", margin + totalWidth - 20, currentY + 5, { align: "right" });
+
+      // Add total values
+      doc.text(formatCurrency(financialTotals.deposite), margin + totalWidth + tableColumns[6].width / 2, currentY + 5, { align: "center" });
+
+      doc.text(formatCurrency(financialTotals.villaPrice), margin + totalWidth + tableColumns[6].width + tableColumns[7].width / 2, currentY + 5, { align: "center" });
+
+      doc.text(formatCurrency(financialTotals.ownerShare), margin + totalWidth + tableColumns[6].width + tableColumns[7].width + tableColumns[8].width / 2, currentY + 5, { align: "center" });
+
+      doc.text(formatCurrency(financialTotals.managerShare), margin + totalWidth + tableColumns[6].width + tableColumns[7].width + tableColumns[8].width + tableColumns[9].width / 2, currentY + 5, { align: "center" });
+
+      // Add footer
+      const footerY = pageHeight - 10;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Dicetak pada: ${format(new Date(), "dd MMMM yyyy HH:mm")}`, margin, footerY);
+      doc.text(`Halaman ${currentPage} dari ${currentPage}`, pageWidth - margin, footerY, { align: "right" });
+
+      // Save the PDF
+      doc.save(`laporan-keuangan-${date?.from ? format(date.from, "dd-MM-yyyy") : ""}-${date?.to ? format(date.to, "dd-MM-yyyy") : ""}.pdf`);
+
+      toast.success("Laporan berhasil diexport ke PDF");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Gagal mengexport laporan ke PDF");
+    }
   };
 
   // Add a title based on user role with null check
@@ -469,10 +701,6 @@ export default function FinancialReportPage() {
         <div className="container mx-auto py-10">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">{getReportTitle()}</h1>
-            <Button onClick={onPrintClick} className="flex items-center gap-2">
-              <Printer className="h-4 w-4" />
-              <span>Cetak PDF</span>
-            </Button>
           </div>
 
           {/* Date Range Picker */}
@@ -549,78 +777,11 @@ export default function FinancialReportPage() {
               </Card>
             </div>
 
-            <Tabs defaultValue="all-bookings" className="no-print" onValueChange={setActiveTab}>
+            <Tabs defaultValue="detailed-financial" className="no-print" onValueChange={setActiveTab}>
               <TabsList className="mb-4">
-                <TabsTrigger value="all-bookings">Semua Booking</TabsTrigger>
-                {(user?.role === "admin" || user?.role === "owner") && <TabsTrigger value="by-villa">Laporan Per Villa</TabsTrigger>}
                 <TabsTrigger value="detailed-financial">Laporan Keuangan Detail</TabsTrigger>
+                {(user?.role === "admin" || user?.role === "owner") && <TabsTrigger value="by-villa">Laporan Per Villa</TabsTrigger>}
               </TabsList>
-
-              <TabsContent value="all-bookings">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Daftar Booking</CardTitle>
-                    <CardDescription>
-                      Semua transaksi booking dalam periode {date?.from && format(date.from, "PPP")} - {date?.to && format(date.to, "PPP")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Order ID</TableHead>
-                          <TableHead>Villa</TableHead>
-                          <TableHead>Tamu</TableHead>
-                          <TableHead>Check In</TableHead>
-                          <TableHead>Check Out</TableHead>
-                          <TableHead>Total Tamu</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Jumlah</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredBookings.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={8} className="text-center">
-                              Tidak ada data booking dalam periode ini
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredBookings.map(booking => (
-                            <TableRow key={booking._id}>
-                              <TableCell className="font-medium">{booking.orderId}</TableCell>
-                              <TableCell>{villaMap[booking.villaId]?.name || "Unknown Villa"}</TableCell>
-                              <TableCell>{booking.name}</TableCell>
-                              <TableCell>{formatDate(booking.checkInDate)}</TableCell>
-                              <TableCell>{formatDate(booking.checkOutDate)}</TableCell>
-                              <TableCell>{booking.guests}</TableCell>
-                              <TableCell>
-                                <span className={`px-2 py-1 rounded-full text-xs ${booking.paymentStatus === "paid" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                                  {booking.paymentStatus === "paid" ? "Lunas" : "Belum Lunas"}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">{formatCurrency(booking.amount)}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                      {filteredBookings.length > 0 && (
-                        <>
-                          <tfoot className="border-t">
-                            <tr>
-                              <td colSpan={7} className="text-right font-medium py-4">
-                                Total:
-                              </td>
-                              <td className="text-right font-medium py-4">{formatCurrency(summaryData.totalRevenue)}</td>
-                            </tr>
-                          </tfoot>
-                          <TableCaption className="sr-only">Total: {formatCurrency(summaryData.totalRevenue)}</TableCaption>
-                        </>
-                      )}
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
 
               <TabsContent value="by-villa">
                 {user?.role === "admin" || user?.role === "owner" ? (
@@ -734,18 +895,11 @@ export default function FinancialReportPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-semibold">Laporan Keuangan</h2>
-                      </div>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <div className="relative">
                           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                           <Input type="search" placeholder="Cari..." className="pl-8 w-full sm:w-[250px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
-                        <Button variant="outline" size="icon">
-                          <Filter className="h-4 w-4" />
-                          <span className="sr-only">Filter</span>
-                        </Button>
                         <Button variant="outline" onClick={handleExport}>
                           <Download className="h-4 w-4 mr-2" />
                           <span>Export Pdf</span>
@@ -788,6 +942,9 @@ export default function FinancialReportPage() {
                               Pembagian
                             </TableHead>
                             <TableHead rowSpan={2} className="border text-center">
+                              Status Pembayaran
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
                               Order ID
                             </TableHead>
                             <TableHead rowSpan={2} className="border text-center">
@@ -817,6 +974,11 @@ export default function FinancialReportPage() {
                                 <TableCell className="border text-right">{formatCurrency(entry.villaPrice)}</TableCell>
                                 <TableCell className="border text-right">{formatCurrency(entry.ownerShare)}</TableCell>
                                 <TableCell className="border text-right">{formatCurrency(entry.managerShare)}</TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded-full text-xs ${entry.paymentStatus === "paid" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                                    {entry.paymentStatus === "paid" ? "Lunas" : "Belum Lunas"}
+                                  </span>
+                                </TableCell>
                                 <TableCell className="border">{entry.notes}</TableCell>
                                 <TableCell className="border">
                                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
@@ -853,263 +1015,6 @@ export default function FinancialReportPage() {
                 </Card>
               </TabsContent>
             </Tabs>
-
-            {/* Print-only content - shows the active tab content when printing */}
-            <div className="hidden print:block">
-              {activeTab === "all-bookings" ? (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold mb-4">Daftar Booking</h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Semua transaksi booking dalam periode {date?.from && format(date.from, "dd MMMM yyyy")} - {date?.to && format(date.to, "dd MMMM yyyy")}
-                  </p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Villa</TableHead>
-                        <TableHead>Tamu</TableHead>
-                        <TableHead>Check In</TableHead>
-                        <TableHead>Check Out</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Jumlah</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredBookings.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center">
-                            Tidak ada data booking dalam periode ini
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredBookings.map(booking => (
-                          <TableRow key={booking._id}>
-                            <TableCell className="font-medium">{booking.orderId}</TableCell>
-                            <TableCell>{villaMap[booking.villaId]?.name || "Unknown Villa"}</TableCell>
-                            <TableCell>{booking.name}</TableCell>
-                            <TableCell>{formatDate(booking.checkInDate)}</TableCell>
-                            <TableCell>{formatDate(booking.checkOutDate)}</TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs ${booking.paymentStatus === "paid" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                                {booking.paymentStatus === "paid" ? "Lunas" : "Belum Lunas"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">{formatCurrency(booking.amount)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                    {filteredBookings.length > 0 && (
-                      <>
-                        <tfoot className="border-t">
-                          <tr>
-                            <td colSpan={6} className="text-right font-medium py-4">
-                              Total:
-                            </td>
-                            <td className="text-right font-medium py-4">{formatCurrency(summaryData.totalRevenue)}</td>
-                          </tr>
-                        </tfoot>
-                        <TableCaption className="sr-only">Total: {formatCurrency(summaryData.totalRevenue)}</TableCaption>
-                      </>
-                    )}
-                  </Table>
-                </div>
-              ) : activeTab === "by-villa" && (user?.role === "admin" || user?.role === "owner") ? (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold mb-4">Ringkasan Per Villa</h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Pendapatan dan jumlah booking per villa dalam periode {date?.from && format(date.from, "dd MMMM yyyy")} - {date?.to && format(date.to, "dd MMMM yyyy")}
-                  </p>
-                  <Table className="mb-8">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Villa</TableHead>
-                        <TableHead>Jumlah Booking</TableHead>
-                        <TableHead className="text-right">Total Pendapatan</TableHead>
-                        <TableHead className="text-right">Rata-rata Per Booking</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {villaSummaries.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center">
-                            Tidak ada data booking dalam periode ini
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        villaSummaries.map(summary => (
-                          <TableRow key={summary.villaId}>
-                            <TableCell className="font-medium">{summary.villaName}</TableCell>
-                            <TableCell>{summary.totalBookings}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(summary.totalRevenue)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(summary.averageBookingValue)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-
-                  {villaSummaries.map(summary => (
-                    <div key={summary.villaId} className="mb-8 page-break-inside-avoid">
-                      <h3 className="text-lg font-bold mb-2">{summary.villaName}</h3>
-                      <p className="text-sm text-gray-600 mb-4">Detail booking untuk {summary.villaName}</p>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Order ID</TableHead>
-                            <TableHead>Tamu</TableHead>
-                            <TableHead>Check In</TableHead>
-                            <TableHead>Check Out</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Jumlah</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {bookingsByVilla[summary.villaId].map(booking => (
-                            <TableRow key={booking._id}>
-                              <TableCell className="font-medium">{booking.orderId}</TableCell>
-                              <TableCell>{booking.name}</TableCell>
-                              <TableCell>{formatDate(booking.checkInDate)}</TableCell>
-                              <TableCell>{formatDate(booking.checkOutDate)}</TableCell>
-                              <TableCell>
-                                <span className={`px-2 py-1 rounded-full text-xs ${booking.paymentStatus === "paid" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                                  {booking.paymentStatus === "paid" ? "Lunas" : "Belum Lunas"}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">{formatCurrency(booking.amount)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                        <tfoot className="border-t">
-                          <tr>
-                            <td colSpan={5} className="text-right font-medium py-4">
-                              Total:
-                            </td>
-                            <td className="text-right font-medium py-4">{formatCurrency(summary.totalRevenue)}</td>
-                          </tr>
-                        </tfoot>
-                        <TableCaption className="sr-only">Total: {formatCurrency(summary.totalRevenue)}</TableCaption>
-                      </Table>
-                    </div>
-                  ))}
-                </div>
-              ) : activeTab === "detailed-financial" ? (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold mb-4">Laporan Keuangan Detail</h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Laporan keuangan detail villa dalam periode {date?.from && format(date.from, "dd MMMM yyyy")} - {date?.to && format(date.to, "dd MMMM yyyy")}
-                  </p>
-                  <Table className="border">
-                    <TableHeader className="bg-muted">
-                      <TableRow>
-                        <TableHead rowSpan={2} className="border text-center">
-                          NO
-                        </TableHead>
-                        <TableHead colSpan={2} className="border text-center">
-                          Hari / Tanggal
-                        </TableHead>
-                        <TableHead colSpan={1} className="border text-center">
-                          Nama Pengunjung
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          DEPOSITE
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Pembookingan
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Villa
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Kapasitas
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Extra Bed
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Price Extra Bed
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Free
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Harga Villa
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Discount
-                        </TableHead>
-                        <TableHead colSpan={2} className="border text-center">
-                          Pembagian
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Moment
-                        </TableHead>
-                        <TableHead rowSpan={2} className="border text-center">
-                          Keterangan
-                        </TableHead>
-                      </TableRow>
-                      <TableRow>
-                        <TableHead className="border text-center">IN</TableHead>
-                        <TableHead className="border text-center">OUT</TableHead>
-                        <TableHead className="border text-center">Penanggung Jawab</TableHead>
-                        <TableHead className="border text-center">60% Pemilik</TableHead>
-                        <TableHead className="border text-center">40% Pengelola</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredFinancialData.length > 0 ? (
-                        filteredFinancialData.map((entry, index) => (
-                          <TableRow key={entry.id}>
-                            <TableCell className="border text-center">{index + 1}</TableCell>
-                            <TableCell className="border text-center">{new Date(entry.dateIn).toLocaleDateString("id-ID")}</TableCell>
-                            <TableCell className="border text-center">{new Date(entry.dateOut).toLocaleDateString("id-ID")}</TableCell>
-                            <TableCell className="border">{entry.personInCharge}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.deposite)}</TableCell>
-                            <TableCell className="border">{entry.booking}</TableCell>
-                            <TableCell className="border">{entry.villa}</TableCell>
-                            <TableCell className="border text-center">{entry.capacity}</TableCell>
-                            <TableCell className="border text-center">{entry.extraBed}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.priceExtraBed)}</TableCell>
-                            <TableCell className="border">{entry.free}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.villaPrice)}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.discount)}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.ownerShare)}</TableCell>
-                            <TableCell className="border text-right">{formatCurrency(entry.managerShare)}</TableCell>
-                            <TableCell className="border">{entry.moment}</TableCell>
-                            <TableCell className="border">{entry.notes}</TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={17} className="h-24 text-center">
-                            Tidak ada data ditemukan.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {/* Totals row */}
-                      <TableRow className="bg-muted/50 font-medium">
-                        <TableCell colSpan={4} className="border text-right">
-                          Total
-                        </TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.deposite)}</TableCell>
-                        <TableCell colSpan={3} className="border"></TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.priceExtraBed)}</TableCell>
-                        <TableCell className="border"></TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.villaPrice)}</TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.discount)}</TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.ownerShare)}</TableCell>
-                        <TableCell className="border text-right">{formatCurrency(financialTotals.managerShare)}</TableCell>
-                        <TableCell colSpan={2} className="border"></TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="mt-8">
-                  <p className="text-center text-amber-600">Anda tidak memiliki akses untuk melihat laporan ini.</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </main>
