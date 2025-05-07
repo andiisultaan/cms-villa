@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Printer } from "lucide-react";
+import { CalendarIcon, Download, Filter, Printer, Search, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -17,8 +17,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CustomCalendar } from "@/components/ui/custom-calendar";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { Input } from "@/components/ui/input";
 
-// Define types based on your API response
+// Define types based on API response
 interface Booking {
   _id: string;
   villaId: string;
@@ -58,6 +59,28 @@ interface Villa {
   }>;
 }
 
+// Financial entry interface for the detailed report
+interface FinancialEntry {
+  id: string;
+  dateIn: string;
+  dateOut: string;
+  visitorName: string;
+  personInCharge: string;
+  deposite: number;
+  booking: string;
+  villa: string;
+  capacity: number;
+  extraBed: number;
+  priceExtraBed: number;
+  free: string;
+  villaPrice: number;
+  discount: number;
+  ownerShare: number;
+  managerShare: number;
+  moment: string;
+  notes: string;
+}
+
 interface ApiResponse<T> {
   statusCode: number;
   message?: string;
@@ -89,6 +112,10 @@ export default function FinancialReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all-bookings");
 
+  // Financial report specific states
+  const [financialData, setFinancialData] = useState<FinancialEntry[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
   const printRef = useRef<HTMLDivElement>(null);
 
   // Handle printing with jsPDF and html2canvas
@@ -97,7 +124,6 @@ export default function FinancialReportPage() {
 
     try {
       // Show loading state or notification if needed
-
       const content = printRef.current;
       const canvas = await html2canvas(content, {
         scale: 2, // Higher scale for better quality
@@ -155,6 +181,84 @@ export default function FinancialReportPage() {
     }
   };
 
+  // Filter financial data based on search term
+  const filteredFinancialData = financialData.filter(
+    entry => entry.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) || entry.villa.toLowerCase().includes(searchTerm.toLowerCase()) || entry.notes.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Calculate financial totals
+  const financialTotals = financialData.reduce(
+    (acc, entry) => {
+      return {
+        deposite: acc.deposite + entry.deposite,
+        extraBed: acc.extraBed + entry.extraBed,
+        priceExtraBed: acc.priceExtraBed + entry.priceExtraBed,
+        villaPrice: acc.villaPrice + entry.villaPrice,
+        discount: acc.discount + entry.discount,
+        ownerShare: acc.ownerShare + entry.ownerShare,
+        managerShare: acc.managerShare + entry.managerShare,
+      };
+    },
+    {
+      deposite: 0,
+      extraBed: 0,
+      priceExtraBed: 0,
+      villaPrice: 0,
+      discount: 0,
+      ownerShare: 0,
+      managerShare: 0,
+    }
+  );
+
+  // Handle deleting a financial entry
+  const handleDeleteEntry = (id: string) => {
+    setFinancialData(financialData.filter(entry => entry.id !== id));
+  };
+
+  // Handle exporting to Excel/CSV
+  const handleExport = () => {
+    // This would be implemented with a library like xlsx in a real application
+    alert("Export functionality would be implemented here");
+  };
+
+  // Generate financial data from bookings and villas
+  const generateFinancialData = (bookings: Booking[], villas: Record<string, Villa>): FinancialEntry[] => {
+    return bookings.map((booking, index) => {
+      const villa = villas[booking.villaId];
+
+      // Calculate shares based on amount (60% owner, 40% manager)
+      const villaPrice = booking.amount;
+      const discount = 0; // No discount info in booking data
+      const ownerShare = Math.round(villaPrice * 0.6);
+      const managerShare = Math.round(villaPrice * 0.4);
+
+      // Default values for missing data
+      const capacity = booking?.guests;
+      const villaName = villa?.name || "Unknown Villa";
+
+      return {
+        id: (index + 1).toString(),
+        dateIn: booking.checkInDate,
+        dateOut: booking.checkOutDate,
+        visitorName: booking.name,
+        personInCharge: booking.name,
+        deposite: booking.amount, // Assuming 30% deposit
+        booking: "Online",
+        villa: villaName,
+        capacity: capacity,
+        extraBed: 0, // No extra bed info in booking data
+        priceExtraBed: 0,
+        free: "-",
+        villaPrice: villaPrice,
+        discount: discount,
+        ownerShare: ownerShare,
+        managerShare: managerShare,
+        moment: "Regular",
+        notes: `${booking.orderId}`,
+      };
+    });
+  };
+
   // Fetch bookings and villas data
   useEffect(() => {
     const fetchData = async () => {
@@ -176,19 +280,36 @@ export default function FinancialReportPage() {
         const villasData: ApiResponse<Villa[]> = await villasResponse.json();
 
         if (bookingsData.data && villasData.data) {
-          setBookings(bookingsData.data);
-          setVillas(villasData.data);
+          const bookingsArray = bookingsData.data || [];
+          const villasArray = villasData.data || [];
+
+          setBookings(bookingsArray);
+          setVillas(villasArray);
 
           // Create villa map for quick lookup
           const map: Record<string, Villa> = {};
-          villasData.data.forEach(villa => {
+          villasArray.forEach(villa => {
             map[villa._id] = villa;
           });
           setVillaMap(map);
+
+          // Generate financial data from bookings and villas
+          const generatedFinancialData = generateFinancialData(bookingsArray, map);
+          setFinancialData(generatedFinancialData);
+        } else {
+          // Set empty arrays if no data
+          setBookings([]);
+          setVillas([]);
+          setFinancialData([]);
         }
       } catch (err) {
         console.error("Error fetching data:", err);
         setError(err instanceof Error ? err.message : "An unknown error occurred");
+
+        // Set empty arrays on error
+        setBookings([]);
+        setVillas([]);
+        setFinancialData([]);
       } finally {
         setLoading(false);
       }
@@ -235,7 +356,11 @@ export default function FinancialReportPage() {
       averageBookingValue,
       occupancyRate,
     });
-  }, [date, bookings, villas]);
+
+    // Update financial data based on filtered bookings
+    const updatedFinancialData = generateFinancialData(filtered, villaMap);
+    setFinancialData(updatedFinancialData);
+  }, [date, bookings, villas, villaMap]);
 
   // Group bookings by villa
   const bookingsByVilla: Record<string, Booking[]> = {};
@@ -428,6 +553,7 @@ export default function FinancialReportPage() {
               <TabsList className="mb-4">
                 <TabsTrigger value="all-bookings">Semua Booking</TabsTrigger>
                 {(user?.role === "admin" || user?.role === "owner") && <TabsTrigger value="by-villa">Laporan Per Villa</TabsTrigger>}
+                <TabsTrigger value="detailed-financial">Laporan Keuangan Detail</TabsTrigger>
               </TabsList>
 
               <TabsContent value="all-bookings">
@@ -455,7 +581,7 @@ export default function FinancialReportPage() {
                       <TableBody>
                         {filteredBookings.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center">
+                            <TableCell colSpan={8} className="text-center">
                               Tidak ada data booking dalam periode ini
                             </TableCell>
                           </TableRow>
@@ -596,6 +722,136 @@ export default function FinancialReportPage() {
                   </Card>
                 )}
               </TabsContent>
+
+              {/* Detailed Financial Report Tab */}
+              <TabsContent value="detailed-financial">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Laporan Keuangan Detail</CardTitle>
+                    <CardDescription>
+                      Laporan keuangan detail villa dalam periode {date?.from && format(date.from, "PPP")} - {date?.to && format(date.to, "PPP")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-semibold">Laporan Keuangan</h2>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input type="search" placeholder="Cari..." className="pl-8 w-full sm:w-[250px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        </div>
+                        <Button variant="outline" size="icon">
+                          <Filter className="h-4 w-4" />
+                          <span className="sr-only">Filter</span>
+                        </Button>
+                        <Button variant="outline" onClick={handleExport}>
+                          <Download className="h-4 w-4 mr-2" />
+                          <span>Export Pdf</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <Table className="border">
+                        <TableHeader className="bg-muted">
+                          <TableRow>
+                            <TableHead rowSpan={2} className="border text-center">
+                              NO
+                            </TableHead>
+                            <TableHead colSpan={2} className="border text-center">
+                              Hari / Tanggal
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Nama Pengunjung
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Pembookingan
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Villa
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Jumlah Tamu
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Extra Bed
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Price Extra Bed
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Harga Villa
+                            </TableHead>
+                            <TableHead colSpan={2} className="border text-center">
+                              Pembagian
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Order ID
+                            </TableHead>
+                            <TableHead rowSpan={2} className="border text-center">
+                              Actions
+                            </TableHead>
+                          </TableRow>
+                          <TableRow>
+                            <TableHead className="border text-center">IN</TableHead>
+                            <TableHead className="border text-center">OUT</TableHead>
+                            <TableHead className="border text-center">60% Pemilik</TableHead>
+                            <TableHead className="border text-center">40% Pengelola</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredFinancialData.length > 0 ? (
+                            filteredFinancialData.map((entry, index) => (
+                              <TableRow key={entry.id}>
+                                <TableCell className="border text-center">{index + 1}</TableCell>
+                                <TableCell className="border text-center">{new Date(entry.dateIn).toLocaleDateString("id-ID")}</TableCell>
+                                <TableCell className="border text-center">{new Date(entry.dateOut).toLocaleDateString("id-ID")}</TableCell>
+                                <TableCell className="border">{entry.personInCharge}</TableCell>
+                                <TableCell className="border text-right">{formatCurrency(entry.deposite)}</TableCell>
+                                <TableCell className="border">{entry.villa}</TableCell>
+                                <TableCell className="border text-center">{entry.capacity}</TableCell>
+                                <TableCell className="border text-center">{entry.extraBed}</TableCell>
+                                <TableCell className="border text-right">{formatCurrency(entry.priceExtraBed)}</TableCell>
+                                <TableCell className="border text-right">{formatCurrency(entry.villaPrice)}</TableCell>
+                                <TableCell className="border text-right">{formatCurrency(entry.ownerShare)}</TableCell>
+                                <TableCell className="border text-right">{formatCurrency(entry.managerShare)}</TableCell>
+                                <TableCell className="border">{entry.notes}</TableCell>
+                                <TableCell className="border">
+                                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Delete</span>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={20} className="h-24 text-center">
+                                Tidak ada data ditemukan.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {/* Totals row */}
+                          <TableRow className="bg-muted/50 font-medium">
+                            <TableCell colSpan={4} className="border text-right">
+                              Total
+                            </TableCell>
+                            <TableCell className="border text-right">{formatCurrency(financialTotals.deposite)}</TableCell>
+                            <TableCell colSpan={3} className="border"></TableCell>
+                            <TableCell className="border text-right">{formatCurrency(financialTotals.priceExtraBed)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(financialTotals.villaPrice)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(financialTotals.ownerShare)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(financialTotals.managerShare)}</TableCell>
+                            <TableCell colSpan={3} className="border"></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
 
             {/* Print-only content - shows the active tab content when printing */}
@@ -658,7 +914,7 @@ export default function FinancialReportPage() {
                     )}
                   </Table>
                 </div>
-              ) : user?.role === "admin" || user?.role === "owner" ? (
+              ) : activeTab === "by-villa" && (user?.role === "admin" || user?.role === "owner") ? (
                 <div className="mt-8">
                   <h2 className="text-xl font-bold mb-4">Ringkasan Per Villa</h2>
                   <p className="text-sm text-gray-600 mb-4">
@@ -737,9 +993,120 @@ export default function FinancialReportPage() {
                     </div>
                   ))}
                 </div>
+              ) : activeTab === "detailed-financial" ? (
+                <div className="mt-8">
+                  <h2 className="text-xl font-bold mb-4">Laporan Keuangan Detail</h2>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Laporan keuangan detail villa dalam periode {date?.from && format(date.from, "dd MMMM yyyy")} - {date?.to && format(date.to, "dd MMMM yyyy")}
+                  </p>
+                  <Table className="border">
+                    <TableHeader className="bg-muted">
+                      <TableRow>
+                        <TableHead rowSpan={2} className="border text-center">
+                          NO
+                        </TableHead>
+                        <TableHead colSpan={2} className="border text-center">
+                          Hari / Tanggal
+                        </TableHead>
+                        <TableHead colSpan={1} className="border text-center">
+                          Nama Pengunjung
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          DEPOSITE
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Pembookingan
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Villa
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Kapasitas
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Extra Bed
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Price Extra Bed
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Free
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Harga Villa
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Discount
+                        </TableHead>
+                        <TableHead colSpan={2} className="border text-center">
+                          Pembagian
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Moment
+                        </TableHead>
+                        <TableHead rowSpan={2} className="border text-center">
+                          Keterangan
+                        </TableHead>
+                      </TableRow>
+                      <TableRow>
+                        <TableHead className="border text-center">IN</TableHead>
+                        <TableHead className="border text-center">OUT</TableHead>
+                        <TableHead className="border text-center">Penanggung Jawab</TableHead>
+                        <TableHead className="border text-center">60% Pemilik</TableHead>
+                        <TableHead className="border text-center">40% Pengelola</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredFinancialData.length > 0 ? (
+                        filteredFinancialData.map((entry, index) => (
+                          <TableRow key={entry.id}>
+                            <TableCell className="border text-center">{index + 1}</TableCell>
+                            <TableCell className="border text-center">{new Date(entry.dateIn).toLocaleDateString("id-ID")}</TableCell>
+                            <TableCell className="border text-center">{new Date(entry.dateOut).toLocaleDateString("id-ID")}</TableCell>
+                            <TableCell className="border">{entry.personInCharge}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.deposite)}</TableCell>
+                            <TableCell className="border">{entry.booking}</TableCell>
+                            <TableCell className="border">{entry.villa}</TableCell>
+                            <TableCell className="border text-center">{entry.capacity}</TableCell>
+                            <TableCell className="border text-center">{entry.extraBed}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.priceExtraBed)}</TableCell>
+                            <TableCell className="border">{entry.free}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.villaPrice)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.discount)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.ownerShare)}</TableCell>
+                            <TableCell className="border text-right">{formatCurrency(entry.managerShare)}</TableCell>
+                            <TableCell className="border">{entry.moment}</TableCell>
+                            <TableCell className="border">{entry.notes}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={17} className="h-24 text-center">
+                            Tidak ada data ditemukan.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {/* Totals row */}
+                      <TableRow className="bg-muted/50 font-medium">
+                        <TableCell colSpan={4} className="border text-right">
+                          Total
+                        </TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.deposite)}</TableCell>
+                        <TableCell colSpan={3} className="border"></TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.priceExtraBed)}</TableCell>
+                        <TableCell className="border"></TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.villaPrice)}</TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.discount)}</TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.ownerShare)}</TableCell>
+                        <TableCell className="border text-right">{formatCurrency(financialTotals.managerShare)}</TableCell>
+                        <TableCell colSpan={2} className="border"></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
                 <div className="mt-8">
-                  <p className="text-center text-amber-600">Anda tidak memiliki akses untuk melihat laporan per villa.</p>
+                  <p className="text-center text-amber-600">Anda tidak memiliki akses untuk melihat laporan ini.</p>
                 </div>
               )}
             </div>
