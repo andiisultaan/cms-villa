@@ -451,296 +451,457 @@ export default function FinancialReportPage() {
 
   const handleExport = () => {
     try {
-      // Create a new PDF document
+      // Initialize PDF document
+      // Adjust the page orientation and margins
       const doc = new jsPDF("landscape", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15; // Increased margin for better spacing
+      const margin = 10; // Reduced from 15 to give more space for the table
+      const primaryColor = [50, 50, 50];
+      const secondaryColor = [100, 100, 100];
+      const accentColor = [0, 100, 200];
 
-      // Add title with better styling
+      // ==================== HEADER SECTION ====================
       doc.setFillColor(240, 240, 240);
       doc.rect(0, 0, pageWidth, margin * 2, "F");
+
+      // Main title
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(50, 50, 50);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text(getReportTitle(), pageWidth / 2, margin, { align: "center" });
 
-      // Add date range with better styling
+      // Date range
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       const dateRangeText = `Periode: ${date?.from ? format(date.from, "dd MMMM yyyy") : ""} - ${date?.to ? format(date.to, "dd MMMM yyyy") : ""}`;
       doc.text(dateRangeText, pageWidth / 2, margin + 7, { align: "center" });
 
-      // Add summary data in a box
+      // ==================== SUMMARY SECTION ====================
       const summaryStartY = margin * 2 + 5;
-      doc.setFillColor(250, 250, 250);
-      doc.roundedRect(margin, summaryStartY, pageWidth - margin * 2, 30, 3, 3, "F");
+      const summaryHeight = 35; // Slightly taller
 
+      // Summary box with rounded corners and subtle shadow effect
+      doc.setFillColor(250, 250, 255);
+      doc.roundedRect(margin, summaryStartY, pageWidth - margin * 2, summaryHeight, 5, 5, "F");
+      doc.setDrawColor(210, 210, 230);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, summaryStartY, pageWidth - margin * 2, summaryHeight, 5, 5, "S");
+
+      // Add subtle shadow effect
+      doc.setDrawColor(230, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 1; i <= 3; i++) {
+        doc.roundedRect(margin + i * 0.3, summaryStartY + i * 0.3, pageWidth - margin * 2, summaryHeight, 5, 5, "S");
+      }
+
+      // Summary title with accent bar
+      doc.setFillColor(70, 70, 100);
+      doc.rect(margin + 5, summaryStartY + 5, 3, 10, "F");
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(50, 50, 50);
-      doc.text("Ringkasan Laporan", margin + 5, summaryStartY + 8);
+      doc.setTextColor(70, 70, 100);
+      doc.text("Ringkasan Laporan", margin + 15, summaryStartY + 10);
 
-      // Create a 2x2 grid for summary data
+      // Summary grid layout
+      const gridConfig = {
+        cols: 2,
+        rows: 2,
+        padding: 5,
+        startX: margin + 10,
+        startY: summaryStartY + 18,
+        colWidth: (pageWidth - margin * 2 - 20) / 2,
+        rowHeight: 9,
+      };
+
+      // Summary data
+      const summaryItems = [
+        { label: "Total Pendapatan:", value: formatCurrency(financialTotals.deposite) },
+        { label: "Jumlah Booking:", value: summaryData.totalBookings.toString() },
+        { label: "Rata-rata Nilai Booking:", value: formatCurrency(summaryData.averageBookingValue) },
+        { label: "Tingkat Okupansi:", value: `${summaryData.occupancyRate.toFixed(1)}%` },
+      ];
+
+      // Draw summary grid
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(80, 80, 80);
+      doc.setTextColor(80, 80, 100);
 
-      const col1X = margin + 10;
-      const col2X = pageWidth / 2;
+      summaryItems.forEach((item, index) => {
+        const col = index % gridConfig.cols;
+        const row = Math.floor(index / gridConfig.cols);
+        const x = gridConfig.startX + col * gridConfig.colWidth;
+        const y = gridConfig.startY + row * gridConfig.rowHeight;
 
-      // Row 1
-      doc.text("Total Pendapatan:", col1X, summaryStartY + 16);
-      doc.setFont("helvetica", "bold");
-      doc.text(formatCurrency(financialTotals.deposite), col1X + 40, summaryStartY + 16);
-      doc.setFont("helvetica", "normal");
+        doc.text(item.label, x, y);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(50, 50, 80);
+        doc.text(item.value, x + 45, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 100);
+      });
 
-      doc.text("Jumlah Booking:", col2X, summaryStartY + 16);
-      doc.setFont("helvetica", "bold");
-      doc.text(summaryData.totalBookings.toString(), col2X + 40, summaryStartY + 16);
-      doc.setFont("helvetica", "normal");
+      // ==================== TABLE SECTION ====================
+      const tableHeaderY = summaryStartY + summaryHeight + 10;
 
-      // Row 2
-      doc.text("Rata-rata Nilai Booking:", col1X, summaryStartY + 24);
-      doc.setFont("helvetica", "bold");
-      doc.text(formatCurrency(summaryData.averageBookingValue), col1X + 40, summaryStartY + 24);
-      doc.setFont("helvetica", "normal");
-
-      doc.text("Tingkat Okupansi:", col2X, summaryStartY + 24);
-      doc.setFont("helvetica", "bold");
-      doc.text(`${summaryData.occupancyRate.toFixed(1)}%`, col2X + 40, summaryStartY + 24);
-
-      // Add financial data table title
-      const tableHeaderY = summaryStartY + 40;
+      // Table title
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(50, 50, 50);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text("Laporan Keuangan Detail", margin, tableHeaderY);
 
-      // Add note about payment status
+      // Table note
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       doc.text("*Hanya transaksi dengan status LUNAS yang dihitung dalam total", pageWidth - margin, tableHeaderY, {
         align: "right",
       });
 
-      // Define table columns with better widths
+      // Table columns configuration
+      // Modify the table columns configuration to better fit the page width
       const tableColumns = [
-        { header: "No", dataKey: "id", width: 8 },
-        { header: "Tanggal IN", dataKey: "dateIn", width: 20 },
-        { header: "Tanggal OUT", dataKey: "dateOut", width: 20 },
-        { header: "Nama", dataKey: "visitorName", width: 30 },
-        { header: "Villa", dataKey: "villa", width: 25 },
-        { header: "Status", dataKey: "status", width: 15 },
-        { header: "Deposite", dataKey: "deposite", width: 22 },
-        { header: "Harga Villa", dataKey: "villaPrice", width: 22 },
-        { header: "60% Pemilik", dataKey: "ownerShare", width: 22 },
-        { header: "40% Pengelola", dataKey: "managerShare", width: 22 },
-        { header: "Order ID", dataKey: "notes", width: 25 },
+        { header: "NO", dataKey: "id", width: 8, align: "center" },
+        {
+          header: "Hari / Tanggal",
+          subHeaders: ["IN", "OUT"],
+          dataKeys: ["dateIn", "dateOut"],
+          width: 25, // Reduced width
+          align: "left",
+        },
+        { header: "Nama Pengunjung", dataKey: "visitorName", width: 25, align: "left" }, // Reduced width
+        { header: "Pembookingan", dataKey: "deposite", width: 22, align: "right" }, // Reduced width
+        { header: "Villa", dataKey: "villa", width: 20, align: "left" }, // Reduced width
+        { header: "Jumlah Tamu", dataKey: "capacity", width: 15, align: "center" }, // Reduced width
+        { header: "Extra Bed", dataKey: "extraBed", width: 15, align: "center" }, // Reduced width
+        { header: "Price Extra Bed", dataKey: "priceExtraBed", width: 22, align: "right" }, // Reduced width
+        { header: "Harga Villa", dataKey: "villaPrice", width: 22, align: "right" }, // Reduced width
+        {
+          header: "Pembagian",
+          subHeaders: ["60% Pemilik", "40% Pengelola"],
+          dataKeys: ["ownerShare", "managerShare"],
+          width: 35, // Reduced width
+          align: "right",
+        },
+        { header: "Status Pembayaran", dataKey: "status", width: 20, align: "center" }, // Reduced width
+        { header: "Order ID", dataKey: "notes", width: 28, align: "left" }, // Adjusted to ensure visibility
       ];
 
-      // Define a type for the table row data
-      type TableRowData = {
-        [key: string]: string; // Add index signature to allow string indexing
-        id: string;
-        dateIn: string;
-        dateOut: string;
-        visitorName: string;
-        villa: string;
-        status: string;
-        deposite: string;
-        villaPrice: string;
-        ownerShare: string;
-        managerShare: string;
-        notes: string;
-      };
+      // Prepare table data
+      const tableData = filteredFinancialData.map((entry, index) => ({
+        id: (index + 1).toString(),
+        dateIn: new Date(entry.dateIn).toLocaleDateString("id-ID"),
+        dateOut: new Date(entry.dateOut).toLocaleDateString("id-ID"),
+        visitorName: entry.visitorName,
+        villa: entry.villa,
+        capacity: entry.capacity.toString(),
+        extraBed: entry.extraBed.toString(),
+        priceExtraBed: formatCurrency(entry.priceExtraBed),
+        deposite: formatCurrency(entry.deposite),
+        villaPrice: formatCurrency(entry.villaPrice),
+        ownerShare: formatCurrency(entry.ownerShare),
+        managerShare: formatCurrency(entry.managerShare),
+        status: entry.paymentStatus === "paid" ? "Lunas" : "Belum Lunas",
+        notes: entry.notes,
+      }));
 
-      // Format data for table
-      const tableData: TableRowData[] = filteredFinancialData.map((entry, index) => {
-        const isPaid = entry.paymentStatus === "paid";
-
-        return {
-          id: (index + 1).toString(),
-          dateIn: new Date(entry.dateIn).toLocaleDateString("id-ID"),
-          dateOut: new Date(entry.dateOut).toLocaleDateString("id-ID"),
-          visitorName: entry.visitorName,
-          villa: entry.villa,
-          status: isPaid ? "LUNAS" : "BELUM LUNAS",
-          deposite: formatCurrency(entry.deposite),
-          villaPrice: formatCurrency(entry.villaPrice),
-          ownerShare: formatCurrency(entry.ownerShare),
-          managerShare: formatCurrency(entry.managerShare),
-          notes: entry.notes,
-        };
-      });
-
-      // Calculate table start position
+      // Table drawing parameters
       const tableStartY = tableHeaderY + 10;
-
-      // Create table headers
-      let currentY = tableStartY;
-      let currentX = margin;
-
-      // Draw table header with gradient
-      doc.setFillColor(230, 230, 230);
-      doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(50, 50, 50);
-
-      tableColumns.forEach(column => {
-        const align = ["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey) ? "right" : "center";
-        doc.text(column.header, currentX + column.width / 2, currentY + 5, { align });
-        currentX += column.width;
-      });
-
-      // Draw table rows with alternating background
-      currentY += 8;
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(70, 70, 70);
-
-      // Check if we need multiple pages
-      const rowHeight = 7;
-      const maxRowsPerPage = Math.floor((pageHeight - currentY - margin * 2) / rowHeight);
+      const rowHeight = 8;
+      const maxRowsPerPage = Math.floor((pageHeight - tableStartY - margin * 2) / rowHeight);
       let currentPage = 1;
+      let currentY = tableStartY;
 
-      tableData.forEach((row, rowIndex) => {
-        // Add alternating row background
-        if (rowIndex % 2 === 0) {
-          doc.setFillColor(245, 245, 245);
-          doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
-        }
+      // Draw table function
+      // Adjust the header drawing function for better fit
+      const drawTableHeader = () => {
+        // Header background - using a nicer gradient effect
+        const gradient = doc.setFillColor(240, 240, 245);
+        doc.rect(margin, currentY, pageWidth - margin * 2, 12, "F");
 
-        // Check if we need a new page
-        if (rowIndex > 0 && rowIndex % maxRowsPerPage === 0) {
-          doc.addPage();
-          currentPage++;
-          currentY = margin + 15;
+        // Border styling
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.2);
+        doc.rect(margin, currentY, pageWidth - margin * 2, 12, "S");
 
-          // Add header to new page
-          doc.setFillColor(240, 240, 240);
-          doc.rect(0, 0, pageWidth, margin * 2, "F");
-          doc.setFontSize(14);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(50, 50, 50);
-          doc.text(`${getReportTitle()} - Halaman ${currentPage}`, pageWidth / 2, margin, { align: "center" });
+        // Header text
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7); // Reduced font size for headers
+        doc.setTextColor(50, 50, 80); // Darker blue-gray for better contrast
 
-          // Add date range
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          doc.text(dateRangeText, pageWidth / 2, margin + 7, { align: "center" });
+        let currentX = margin;
 
-          // Redraw table header
-          doc.setFillColor(230, 230, 230);
-          doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(50, 50, 50);
-
-          currentX = margin;
-          tableColumns.forEach(column => {
-            const align = ["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey) ? "right" : "center";
-            doc.text(column.header, currentX + column.width / 2, currentY + 5, { align });
-            currentX += column.width;
-          });
-
-          currentY += 8;
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(70, 70, 70);
-        }
-
-        // Draw row
-        currentX = margin;
-        doc.setFontSize(7);
-
-        // Draw cell borders and text
+        // First draw all header text
         tableColumns.forEach(column => {
-          // Draw light cell borders
-          doc.setDrawColor(220, 220, 220);
-          doc.rect(currentX, currentY, column.width, rowHeight);
+          if (column.subHeaders) {
+            // Main header
+            doc.text(column.header, currentX + column.width / 2, currentY + 5, { align: "center" });
+          } else {
+            // Regular header
+            doc.text(column.header, currentX + column.width / 2, currentY + 7, { align: "center" });
+          }
+          currentX += column.width;
+        });
 
-          // Align numbers to right, text to left or center
-          const cellValue = row[column.dataKey] || "";
-          let align = "left";
+        // Draw subheaders text
+        currentX = margin;
+        tableColumns.forEach(column => {
+          if (column.subHeaders) {
+            const subWidth = column.width / column.subHeaders.length;
 
-          if (["deposite", "villaPrice", "ownerShare", "managerShare"].includes(column.dataKey)) {
-            align = "right";
-          } else if (["id", "status"].includes(column.dataKey)) {
-            align = "center";
+            column.subHeaders.forEach((subHeader, idx) => {
+              const subX = currentX + subWidth * idx + subWidth / 2;
+              doc.text(subHeader, subX, currentY + 10, { align: "center" });
+            });
+          }
+          currentX += column.width;
+        });
+
+        // Then draw all vertical borders separately
+        currentX = margin;
+        tableColumns.forEach((column, index) => {
+          // Vertical border - thinner lines
+          doc.setLineWidth(0.1);
+
+          // Only draw prominent vertical lines at main column boundaries
+          if (index === 0 || column.subHeaders) {
+            doc.setDrawColor(180, 180, 180);
+          } else {
+            doc.setDrawColor(220, 220, 220); // Lighter color for internal borders
           }
 
-          // Set color for status
-          if (column.dataKey === "status") {
-            if (cellValue === "LUNAS") {
-              doc.setTextColor(0, 128, 0); // Green for paid
-            } else {
-              doc.setTextColor(200, 100, 0); // Orange for unpaid
+          doc.line(currentX, currentY, currentX, currentY + 12);
+
+          // Draw internal subheader dividers if needed
+          if (column.subHeaders) {
+            const subWidth = column.width / column.subHeaders.length;
+
+            for (let i = 1; i < column.subHeaders.length; i++) {
+              doc.setDrawColor(220, 220, 220); // Lighter color for subheader dividers
+              doc.line(currentX + subWidth * i, currentY + 6, currentX + subWidth * i, currentY + 12);
             }
           }
-
-          // Calculate x position based on alignment
-          let xPos;
-          if (align === "right") {
-            xPos = currentX + column.width - 2;
-          } else if (align === "center") {
-            xPos = currentX + column.width / 2;
-          } else {
-            xPos = currentX + 2;
-          }
-
-          doc.text(cellValue.toString(), xPos, currentY + 4, {
-            align: align as "left" | "center" | "right" | "justify",
-          });
-
-          // Reset text color
-          doc.setTextColor(70, 70, 70);
 
           currentX += column.width;
         });
 
-        currentY += rowHeight;
-      });
+        // Final vertical border
+        doc.setDrawColor(180, 180, 180);
+        doc.line(currentX, currentY, currentX, currentY + 12);
 
-      // Add totals row with better styling
-      doc.setFillColor(230, 230, 230);
-      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight + 2, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(50, 50, 50);
+        // Horizontal divider for subheaders
+        doc.setLineWidth(0.2);
+        doc.line(margin, currentY + 6, pageWidth - margin, currentY + 6);
 
-      // Draw totals
-      currentX = margin;
-      let totalWidth = 0;
+        currentY += 12;
+      };
 
-      // Skip columns for totals
-      for (let i = 0; i < 6; i++) {
-        totalWidth += tableColumns[i].width;
+      // Draw table rows function
+      // Modify the drawTableRows function to handle text overflow
+      const drawTableRows = (rows: typeof tableData) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5); // Reduced font size to fit more text
+        doc.setTextColor(60, 60, 60);
+
+        rows.forEach((row, rowIndex) => {
+          // Alternate row background - more subtle
+          if (rowIndex % 2 === 0) {
+            doc.setFillColor(248, 248, 252);
+            doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+          }
+
+          let currentX = margin;
+
+          // First draw all cell content
+          tableColumns.forEach(column => {
+            // Handle cell content
+            if (column.subHeaders) {
+              // Subheader columns
+              const subWidth = column.width / column.subHeaders.length;
+
+              column.dataKeys.forEach((dataKey, idx) => {
+                const cellX = currentX + subWidth * idx;
+                const align = column.align || "left";
+                // Add more padding to prevent text from touching borders
+                const xPos = align === "right" ? cellX + subWidth - 3 : align === "center" ? cellX + subWidth / 2 : cellX + 3;
+
+                // Truncate text if needed
+                const text = (row as any)[dataKey].toString();
+                doc.text(text, xPos, currentY + 5, {
+                  align: align as "left" | "center" | "right" | "justify" | undefined,
+                });
+              });
+            } else {
+              // Regular columns
+              const align = column.align || "left";
+              // Add more padding to prevent text from touching borders
+              const xPos = align === "right" ? currentX + column.width - 3 : align === "center" ? currentX + column.width / 2 : currentX + 3;
+
+              // Special styling for status column
+              if (column.dataKey === "status") {
+                if (row.status === "Lunas") {
+                  doc.setTextColor(0, 128, 0); // Green for paid
+                } else {
+                  doc.setTextColor(220, 100, 0); // Orange for unpaid
+                }
+                // Add a subtle background for status
+                const statusBgColor = row.status === "Lunas" ? [240, 250, 240] : [250, 245, 235];
+                doc.setFillColor(statusBgColor[0], statusBgColor[1], statusBgColor[2]);
+                doc.rect(currentX + 1, currentY + 1, column.width - 2, rowHeight - 2, "F");
+              }
+
+              // For Order ID column, ensure it's fully visible
+              if (column.dataKey === "notes") {
+                doc.setTextColor(50, 50, 100); // Make Order ID more visible
+              }
+
+              const text = (row as any)[column.dataKey].toString();
+              doc.text(text, xPos, currentY + 5, {
+                align: align as "left" | "center" | "right" | "justify" | undefined,
+              });
+
+              // Reset text color
+              if (column.dataKey === "status" || column.dataKey === "notes") {
+                doc.setTextColor(60, 60, 60);
+              }
+            }
+
+            currentX += column.width;
+          });
+
+          // Then draw all borders separately to avoid overlapping with text
+          currentX = margin;
+          tableColumns.forEach(column => {
+            // Draw cell border - lighter, thinner borders
+            doc.setDrawColor(230, 230, 230);
+            doc.setLineWidth(0.1);
+
+            // Only draw horizontal lines and vertical lines at column edges
+            if (rowIndex === rows.length - 1) {
+              // Bottom border for last row
+              doc.line(currentX, currentY + rowHeight, currentX + column.width, currentY + rowHeight);
+            }
+
+            // Vertical borders - only draw at the start of each column, not at the end
+            if (column === tableColumns[0] || column.subHeaders) {
+              doc.line(currentX, currentY, currentX, currentY + rowHeight);
+            } else {
+              // For other columns, draw a very light line
+              doc.setDrawColor(240, 240, 240);
+              doc.line(currentX, currentY, currentX, currentY + rowHeight);
+            }
+
+            // Draw the final vertical border at the end of the last column
+            if (column === tableColumns[tableColumns.length - 1]) {
+              doc.setDrawColor(230, 230, 230);
+              doc.line(currentX + column.width, currentY, currentX + column.width, currentY + rowHeight);
+            }
+
+            currentX += column.width;
+          });
+
+          currentY += rowHeight;
+        });
+      };
+
+      // Draw table for current page
+      const drawTablePage = (rows: typeof tableData, isFirstPage: boolean) => {
+        if (!isFirstPage) {
+          doc.addPage();
+          currentPage++;
+          currentY = margin + 15;
+
+          // Page header
+          doc.setFillColor(240, 240, 240);
+          doc.rect(0, 0, pageWidth, margin * 2, "F");
+          doc.setFontSize(14);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          doc.text(`${getReportTitle()} - Halaman ${currentPage}`, pageWidth / 2, margin, { align: "center" });
+
+          // Date range
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+          doc.text(dateRangeText, pageWidth / 2, margin + 7, { align: "center" });
+
+          currentY += 10;
+        }
+
+        drawTableHeader();
+        drawTableRows(rows);
+      };
+
+      // Paginate and draw table
+      for (let i = 0; i < tableData.length; i += maxRowsPerPage) {
+        const pageRows = tableData.slice(i, i + maxRowsPerPage);
+        drawTablePage(pageRows, i === 0);
       }
 
-      doc.text("TOTAL", margin + totalWidth - 20, currentY + 5, { align: "right" });
+      // ==================== TOTALS ROW ====================
+      doc.setFillColor(240, 240, 250); // Lighter blue-gray background
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight + 4, "F");
+      doc.setDrawColor(180, 180, 200);
+      doc.setLineWidth(0.3); // Slightly thicker border for emphasis
+      doc.rect(margin, currentY, pageWidth - margin * 2, rowHeight + 4, "S");
 
-      // Add total values
-      doc.text(formatCurrency(financialTotals.deposite), margin + totalWidth + tableColumns[6].width / 2, currentY + 5, { align: "center" });
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5); // Slightly larger font
+      doc.setTextColor(50, 50, 100); // Darker blue for emphasis
 
-      doc.text(formatCurrency(financialTotals.villaPrice), margin + totalWidth + tableColumns[6].width + tableColumns[7].width / 2, currentY + 5, { align: "center" });
+      // Draw "Total" label
+      doc.text("Total", margin + 10, currentY + 6, { align: "left" });
 
-      doc.text(formatCurrency(financialTotals.ownerShare), margin + totalWidth + tableColumns[6].width + tableColumns[7].width + tableColumns[8].width / 2, currentY + 5, { align: "center" });
+      // Calculate total values positions
+      let totalX = margin;
 
-      doc.text(formatCurrency(financialTotals.managerShare), margin + totalWidth + tableColumns[6].width + tableColumns[7].width + tableColumns[8].width + tableColumns[9].width / 2, currentY + 5, { align: "center" });
+      // Skip NO, Hari/Tanggal, and Nama Pengunjung columns
+      totalX += tableColumns[0].width + tableColumns[1].width + tableColumns[2].width;
 
-      // Add footer
+      // Deposite total
+      doc.text(formatCurrency(financialTotals.deposite), totalX + tableColumns[3].width - 2, currentY + 6, {
+        align: "right",
+      });
+      totalX += tableColumns[3].width;
+
+      // Skip Villa and Jumlah Tamu columns
+      totalX += tableColumns[4].width + tableColumns[5].width;
+
+      // Extra Bed total
+      doc.text(financialTotals.extraBed.toString(), totalX + tableColumns[6].width / 2, currentY + 6, { align: "center" });
+      totalX += tableColumns[6].width;
+
+      // Price Extra Bed total
+      doc.text(formatCurrency(financialTotals.priceExtraBed), totalX + tableColumns[7].width - 2, currentY + 6, {
+        align: "right",
+      });
+      totalX += tableColumns[7].width;
+
+      // Villa Price total
+      doc.text(formatCurrency(financialTotals.villaPrice), totalX + tableColumns[8].width - 2, currentY + 6, {
+        align: "right",
+      });
+      totalX += tableColumns[8].width;
+
+      // Pembagian totals
+      const pembagianWidth = tableColumns[9].width / 2;
+      doc.text(formatCurrency(financialTotals.ownerShare), totalX + pembagianWidth - 2, currentY + 6, { align: "right" });
+      doc.text(formatCurrency(financialTotals.managerShare), totalX + pembagianWidth * 2 - 2, currentY + 6, {
+        align: "right",
+      });
+
+      // ==================== FOOTER SECTION ====================
       const footerY = pageHeight - 10;
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
       doc.setTextColor(150, 150, 150);
       doc.text(`Dicetak pada: ${format(new Date(), "dd MMMM yyyy HH:mm")}`, margin, footerY);
-      doc.text(`Halaman ${currentPage} dari ${currentPage}`, pageWidth - margin, footerY, { align: "right" });
+      doc.text(`Halaman ${currentPage}`, pageWidth - margin, footerY, { align: "right" });
 
       // Save the PDF
-      doc.save(`laporan-keuangan-${date?.from ? format(date.from, "dd-MM-yyyy") : ""}-${date?.to ? format(date.to, "dd-MM-yyyy") : ""}.pdf`);
+      const fileName = `laporan-keuangan-${date?.from ? format(date.from, "dd-MM-yyyy") : ""}-${date?.to ? format(date.to, "dd-MM-yyyy") : ""}.pdf`;
+      doc.save(fileName);
 
       toast.success("Laporan berhasil diexport ke PDF");
     } catch (error) {
