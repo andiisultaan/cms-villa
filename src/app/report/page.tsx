@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Filter, Search, Trash2 } from "lucide-react";
+import { CalendarIcon, Download, Edit, Search, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import jsPDF from "jspdf";
 import { toast, Toaster } from "sonner";
@@ -18,6 +18,7 @@ import { CustomCalendar } from "@/components/ui/custom-calendar";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { Input } from "@/components/ui/input";
+import { EditEntryPanel } from "@/components/edit-entry-dialog";
 
 // Define types based on API response
 interface Booking {
@@ -33,6 +34,8 @@ interface Booking {
   paymentId: string;
   paymentStatus: string;
   amount: number;
+  extraBed?: number;
+  priceExtraBed?: number;
 }
 
 interface Villa {
@@ -89,6 +92,7 @@ export default function FinancialReportPage() {
   // Get user from auth context with fallback for when it's undefined
   const { data: session } = useAuth();
   const user = session?.user;
+  const isAdmin = session?.user?.role === "admin";
 
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
@@ -112,6 +116,8 @@ export default function FinancialReportPage() {
   // Financial report specific states
   const [financialData, setFinancialData] = useState<FinancialEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingEntry, setEditingEntry] = useState<FinancialEntry | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +161,60 @@ export default function FinancialReportPage() {
     setFinancialData(financialData.filter(entry => entry.id !== id));
   };
 
+  const handleEditEntry = (id: string) => {
+    const entry = financialData.find(entry => entry.id === id);
+    if (entry) {
+      setEditingEntry(entry);
+      setIsEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveEntry = async (updatedEntry: FinancialEntry) => {
+    try {
+      // Find the original booking that corresponds to this entry
+      const originalBooking = bookings.find(booking => {
+        // Match by order ID which is stored in notes
+        return booking.orderId === updatedEntry.notes;
+      });
+
+      if (!originalBooking) {
+        toast.error("Could not find corresponding booking");
+        return;
+      }
+
+      // Prepare data for API request - only updating extraBed fields
+      const bookingId = originalBooking._id;
+      const updateData = {
+        extraBed: updatedEntry.extraBed,
+        priceExtraBed: updatedEntry.priceExtraBed,
+      };
+
+      // Send PATCH request to update the booking
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update booking");
+      }
+
+      // Update local state
+      setFinancialData(financialData.map(entry => (entry.id === updatedEntry.id ? updatedEntry : entry)));
+
+      // Close dialog and show success message
+      setIsEditDialogOpen(false);
+      toast.success("Extra bed information updated successfully");
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update extra bed information");
+    }
+  };
+
   // Generate financial data from bookings and villas
   const generateFinancialData = (bookings: Booking[], villas: Record<string, Villa>): FinancialEntry[] => {
     return bookings.map((booking, index) => {
@@ -169,6 +229,10 @@ export default function FinancialReportPage() {
       const capacity = booking?.guests;
       const villaName = villa?.name || "Unknown Villa";
 
+      // Check for extraBed and priceExtraBed in booking data
+      const extraBed = (booking as any).extraBed || 0;
+      const priceExtraBed = (booking as any).priceExtraBed || 0;
+
       return {
         id: (index + 1).toString(),
         dateIn: booking.checkInDate,
@@ -178,8 +242,8 @@ export default function FinancialReportPage() {
         deposite: booking.amount,
         villa: villaName,
         capacity: capacity,
-        extraBed: 0, // No extra bed info in booking data
-        priceExtraBed: 0,
+        extraBed: extraBed,
+        priceExtraBed: priceExtraBed,
         villaPrice: villaPrice,
         ownerShare: ownerShare,
         managerShare: managerShare,
@@ -588,7 +652,9 @@ export default function FinancialReportPage() {
             xPos = currentX + 2;
           }
 
-          doc.text(cellValue.toString(), xPos, currentY + 4, { align: align as "left" | "center" | "right" | "justify" });
+          doc.text(cellValue.toString(), xPos, currentY + 4, {
+            align: align as "left" | "center" | "right" | "justify",
+          });
 
           // Reset text color
           doc.setTextColor(70, 70, 70);
@@ -947,9 +1013,11 @@ export default function FinancialReportPage() {
                             <TableHead rowSpan={2} className="border text-center">
                               Order ID
                             </TableHead>
-                            <TableHead rowSpan={2} className="border text-center">
-                              Actions
-                            </TableHead>
+                            {isAdmin && (
+                              <TableHead rowSpan={2} className="border text-center">
+                                Actions
+                              </TableHead>
+                            )}
                           </TableRow>
                           <TableRow>
                             <TableHead className="border text-center">IN</TableHead>
@@ -980,12 +1048,20 @@ export default function FinancialReportPage() {
                                   </span>
                                 </TableCell>
                                 <TableCell className="border">{entry.notes}</TableCell>
-                                <TableCell className="border">
-                                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="sr-only">Delete</span>
-                                  </Button>
-                                </TableCell>
+                                {isAdmin && (
+                                  <>
+                                    <TableCell className="border">
+                                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete</span>
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="text-primary" onClick={() => handleEditEntry(entry.id)}>
+                                        <Edit className="h-4 w-4" />
+                                        <span className="sr-only">Edit</span>
+                                      </Button>
+                                    </TableCell>
+                                  </>
+                                )}
                               </TableRow>
                             ))
                           ) : (
@@ -1016,6 +1092,8 @@ export default function FinancialReportPage() {
               </TabsContent>
             </Tabs>
           </div>
+          <EditEntryPanel entry={editingEntry} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSave={handleSaveEntry} villas={villas} />
+          <Toaster />
         </div>
       </main>
     </div>

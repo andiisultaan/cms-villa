@@ -100,3 +100,17 @@ export const getBookingByOrderId = async (orderId: string) => {
 
   return booking;
 };
+
+export const updateBook = async (id: string, updateData: Partial<Omit<BookModel, "_id">>) => {
+  const db = await getDb();
+
+  const result = await db.collection(COLLECTION_NAME).updateOne({ _id: new ObjectId(id) }, { $set: updateData });
+
+  if (result.matchedCount === 0) {
+    return null; // No document matched the ID
+  }
+
+  // Return the updated document
+  const updatedBooking = await getBookingById(id);
+  return updatedBooking;
+};
