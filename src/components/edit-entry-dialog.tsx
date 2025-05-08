@@ -111,7 +111,7 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
         <form onSubmit={handleSubmit}>
           <SheetHeader className="mb-4">
             <SheetTitle>Edit Financial Entry</SheetTitle>
-            <SheetDescription>Make changes to the financial entry. Click save when you're done.</SheetDescription>
+            <SheetDescription>Make changes to the financial entry. Click save when you&apos;re done.</SheetDescription>
           </SheetHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
