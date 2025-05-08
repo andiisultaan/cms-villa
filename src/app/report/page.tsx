@@ -157,8 +157,47 @@ export default function FinancialReportPage() {
   );
 
   // Handle deleting a financial entry
-  const handleDeleteEntry = (id: string) => {
-    setFinancialData(financialData.filter(entry => entry.id !== id));
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      // Find the entry to be deleted
+      const entryToDelete = financialData.find(entry => entry.id === id);
+
+      if (!entryToDelete) {
+        toast.error("Entry not found");
+        return;
+      }
+
+      // Find the original booking that corresponds to this entry
+      const originalBooking = bookings.find(booking => {
+        // Match by order ID which is stored in notes
+        return booking.orderId === entryToDelete.notes;
+      });
+
+      if (!originalBooking) {
+        toast.error("Could not find corresponding booking");
+        return;
+      }
+
+      // Send DELETE request to the API
+      const bookingId = originalBooking._id;
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete booking");
+      }
+
+      // Update local state by removing the deleted entry
+      setFinancialData(financialData.filter(entry => entry.id !== id));
+
+      // Show success message
+      toast.success("Entry deleted successfully");
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete entry");
+    }
   };
 
   const handleEditEntry = (id: string) => {

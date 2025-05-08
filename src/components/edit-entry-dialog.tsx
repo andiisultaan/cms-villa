@@ -130,6 +130,8 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
                       dateIn: date.toISOString(),
                     });
                   }}
+                  readOnly
+                  className="bg-muted"
                 />
               </div>
 
@@ -148,6 +150,8 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
                       dateOut: date.toISOString(),
                     });
                   }}
+                  readOnly
+                  className="bg-muted"
                 />
               </div>
             </div>
@@ -155,20 +159,20 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
             {/* Visitor Name */}
             <div className="space-y-2">
               <Label htmlFor="visitorName">Visitor Name</Label>
-              <Input id="visitorName" name="visitorName" value={formData.visitorName} onChange={handleInputChange} />
+              <Input id="visitorName" name="visitorName" value={formData.visitorName} onChange={handleInputChange} readOnly className="bg-muted" />
             </div>
 
             {/* Person In Charge */}
             <div className="space-y-2">
               <Label htmlFor="personInCharge">Person In Charge</Label>
-              <Input id="personInCharge" name="personInCharge" value={formData.personInCharge} onChange={handleInputChange} />
+              <Input id="personInCharge" name="personInCharge" value={formData.personInCharge} onChange={handleInputChange} readOnly className="bg-muted" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Villa */}
               <div className="space-y-2">
                 <Label htmlFor="villa">Villa</Label>
-                <Select value={formData.villa} onValueChange={value => handleSelectChange("villa", value)}>
+                <Select value={formData.villa} onValueChange={value => handleSelectChange("villa", value)} disabled>
                   <SelectTrigger>
                     <SelectValue placeholder="Select villa" />
                   </SelectTrigger>
@@ -185,7 +189,7 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
               {/* Payment Status */}
               <div className="space-y-2">
                 <Label htmlFor="paymentStatus">Payment Status</Label>
-                <Select value={formData.paymentStatus} onValueChange={value => handleSelectChange("paymentStatus", value)}>
+                <Select value={formData.paymentStatus} onValueChange={value => handleSelectChange("paymentStatus", value)} disabled>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -201,7 +205,7 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
               {/* Capacity */}
               <div className="space-y-2">
                 <Label htmlFor="capacity">Capacity</Label>
-                <Input id="capacity" name="capacity" type="number" value={formData.capacity} onChange={handleInputChange} />
+                <Input id="capacity" name="capacity" type="number" value={formData.capacity} onChange={handleInputChange} readOnly className="bg-muted" />
               </div>
 
               {/* Extra Bed */}
@@ -230,6 +234,8 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
                     const price = e.target.value === "" ? 0 : Number(e.target.value);
                     calculateShares(price);
                   }}
+                  readOnly
+                  className="bg-muted"
                 />
               </div>
 
@@ -249,13 +255,13 @@ export function EditEntryPanel({ entry, open, onOpenChange, onSave, villas }: Ed
             {/* Deposit */}
             <div className="space-y-2">
               <Label htmlFor="deposite">Deposit</Label>
-              <Input id="deposite" name="deposite" type="number" value={formData.deposite} onChange={handleInputChange} />
+              <Input id="deposite" name="deposite" type="number" value={formData.deposite} onChange={handleInputChange} readOnly className="bg-muted" />
             </div>
 
             {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Order ID / Notes</Label>
-              <Textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={2} />
+              <Textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={2} readOnly className="bg-muted" />
             </div>
           </div>
           <SheetFooter className="mt-4">
