@@ -92,7 +92,7 @@ export default function FinancialReportPage() {
   // Get user from auth context with fallback for when it's undefined
   const { data: session } = useAuth();
   const user = session?.user;
-  const isAdmin = session?.user?.role === "admin";
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "staff";
 
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month

@@ -104,7 +104,7 @@ function BookingsTable() {
 
   // Get user session and role
   const { data: session } = useAuth();
-  const isAdmin = session?.user?.role === "admin";
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "staff";
 
   const fetchData = useCallback(async (showLoadingState = true) => {
     if (showLoadingState) {
