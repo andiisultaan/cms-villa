@@ -16,6 +16,9 @@ export default function Navigation() {
   // Check if user is not an owner (meaning they can see management options)
   const canManage = userRole && userRole !== "owner";
 
+  // Check if user has permission to add users (not staff or owner)
+  const canAddUsers = userRole && userRole !== "owner" && userRole !== "staff";
+
   // Get initials for avatar
   const getInitials = (name: string) => {
     return name
@@ -55,7 +58,7 @@ export default function Navigation() {
         </Link>
       </div>
 
-      {/* Only show management section if user is not an owner */}
+      {/* Management section - visible to all management roles */}
       {canManage && (
         <div className="flex flex-col space-y-1 mt-4">
           <div className="px-4 py-2 text-sm font-medium text-muted-foreground">Management</div>
@@ -65,12 +68,16 @@ export default function Navigation() {
               Add Villa
             </Button>
           </Link>
-          <Link href="/add-user" className="w-full">
-            <Button variant="ghost" className="w-full justify-start">
-              <UserPlusIcon className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
-          </Link>
+
+          {/* Only show Add User option to roles with permission (not staff) */}
+          {canAddUsers && (
+            <Link href="/add-user" className="w-full">
+              <Button variant="ghost" className="w-full justify-start">
+                <UserPlusIcon className="mr-2 h-4 w-4" />
+                Add User
+              </Button>
+            </Link>
+          )}
         </div>
       )}
 
@@ -86,7 +93,6 @@ export default function Navigation() {
           </div>
         </div>
 
-        {/* Replace the form with the new LogoutButton component */}
         <LogoutButton />
       </div>
     </nav>
