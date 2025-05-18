@@ -869,7 +869,9 @@ export default function FinancialReportPage() {
       totalX += tableColumns[4].width + tableColumns[5].width;
 
       // Extra Bed total
-      doc.text(financialTotals.extraBed.toString(), totalX + tableColumns[6].width / 2, currentY + 6, { align: "center" });
+      doc.text(financialTotals.extraBed.toString(), totalX + tableColumns[6].width / 2, currentY + 6, {
+        align: "center",
+      });
       totalX += tableColumns[6].width;
 
       // Price Extra Bed total
@@ -886,7 +888,9 @@ export default function FinancialReportPage() {
 
       // Pembagian totals
       const pembagianWidth = tableColumns[9].width / 2;
-      doc.text(formatCurrency(financialTotals.ownerShare), totalX + pembagianWidth - 2, currentY + 6, { align: "right" });
+      doc.text(formatCurrency(financialTotals.ownerShare), totalX + pembagianWidth - 2, currentY + 6, {
+        align: "right",
+      });
       doc.text(formatCurrency(financialTotals.managerShare), totalX + pembagianWidth * 2 - 2, currentY + 6, {
         align: "right",
       });
@@ -916,6 +920,133 @@ export default function FinancialReportPage() {
       return "Laporan Keuangan Villa Anda";
     }
     return "Laporan Keuangan Villa";
+  };
+
+  const printInvoice = (entry: FinancialEntry) => {
+    try {
+      // Initialize PDF document
+      const doc = new jsPDF("portrait", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+
+      // ==================== HEADER SECTION ====================
+      doc.setFillColor(245, 245, 255);
+      doc.rect(0, 0, pageWidth, 40, "F");
+
+      // Invoice title
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 50, 100);
+      doc.text("INVOICE", pageWidth / 2, 20, { align: "center" });
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text("Villa Booking Receipt", pageWidth / 2, 30, { align: "center" });
+
+      // ==================== CUSTOMER INFO SECTION ====================
+      const infoStartY = 50;
+
+      // Left side - Customer details
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Customer Details:", margin, infoStartY);
+
+      doc.setFont("helvetica", "normal");
+      doc.text(`Name: ${entry.visitorName}`, margin, infoStartY + 8);
+      doc.text(`Order ID: ${entry.notes}`, margin, infoStartY + 16);
+
+      // Right side - Booking details
+      doc.setFont("helvetica", "bold");
+      doc.text("Booking Details:", pageWidth - margin - 60, infoStartY);
+
+      doc.setFont("helvetica", "normal");
+      doc.text(`Check-in: ${formatDate(entry.dateIn)}`, pageWidth - margin - 60, infoStartY + 8);
+      doc.text(`Check-out: ${formatDate(entry.dateOut)}`, pageWidth - margin - 60, infoStartY + 16);
+      doc.text(`Villa: ${entry.villa}`, pageWidth - margin - 60, infoStartY + 24);
+
+      // ==================== INVOICE DETAILS SECTION ====================
+      const tableStartY = infoStartY + 40;
+
+      // Table header
+      doc.setFillColor(240, 240, 250);
+      doc.rect(margin, tableStartY, pageWidth - margin * 2, 10, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("Description", margin + 5, tableStartY + 7);
+      doc.text("Qty", pageWidth - margin - 90, tableStartY + 7);
+      // doc.text("Price", pageWidth - margin - 60, tableStartY + 7);
+      doc.text("Price", pageWidth - margin - 20, tableStartY + 7, { align: "right" });
+
+      // Table rows
+      let currentY = tableStartY + 15;
+
+      // Villa booking row
+      doc.setFont("helvetica", "normal");
+      doc.text(`Villa Booking (${entry.villa})`, margin + 5, currentY);
+      doc.text("1", pageWidth - margin - 90, currentY);
+      // doc.text(formatCurrency(entry.villaPrice), pageWidth - margin - 60, currentY);
+      doc.text(formatCurrency(entry.villaPrice), pageWidth - margin - 20, currentY, { align: "right" });
+
+      currentY += 10;
+
+      // Extra bed row (if applicable)
+      if (entry.extraBed > 0) {
+        doc.text("Extra Bed", margin + 5, currentY);
+        doc.text(entry.extraBed.toString(), pageWidth - margin - 90, currentY);
+        // doc.text(formatCurrency(entry.priceExtraBed / entry.extraBed), pageWidth - margin - 60, currentY);
+        doc.text(formatCurrency(entry.priceExtraBed), pageWidth - margin - 20, currentY, { align: "right" });
+        currentY += 10;
+      }
+
+      // Divider line
+      doc.setDrawColor(200, 200, 220);
+      doc.setLineWidth(0.5);
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+
+      currentY += 10;
+
+      // Calculate total (villa price + extra bed cost)
+      const totalAmount = entry.villaPrice + entry.priceExtraBed;
+
+      // Total
+      doc.setFont("helvetica", "bold");
+      doc.text("Total", pageWidth - margin - 60, currentY);
+      doc.text(formatCurrency(totalAmount), pageWidth - margin - 20, currentY, { align: "right" });
+
+      // Payment status
+      currentY += 20;
+      doc.setFontSize(12);
+
+      if (entry.paymentStatus === "paid") {
+        doc.setTextColor(0, 120, 0);
+        doc.text("PAID", pageWidth - margin - 20, currentY, { align: "right" });
+      } else {
+        doc.setTextColor(200, 80, 0);
+        doc.text("UNPAID", pageWidth - margin - 20, currentY, { align: "right" });
+      }
+
+      // ==================== FOOTER SECTION ====================
+      const footerY = pageHeight - 30;
+
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "italic");
+      doc.text("Thank you for your booking!", pageWidth / 2, footerY, { align: "center" });
+      doc.text(`Generated on: ${format(new Date(), "dd MMMM yyyy HH:mm")}`, pageWidth / 2, footerY + 7, {
+        align: "center",
+      });
+
+      // Save the PDF
+      const fileName = `invoice-${entry.villa}-${entry.notes}.pdf`;
+      doc.save(fileName);
+
+      toast.success("Invoice berhasil dicetak");
+    } catch (error) {
+      console.error("Error printing invoice:", error);
+      toast.error("Gagal mencetak invoice");
+    }
   };
 
   if (loading) {
@@ -1251,14 +1382,20 @@ export default function FinancialReportPage() {
                                 {isAdmin && (
                                   <>
                                     <TableCell className="border">
-                                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                        <span className="sr-only">Delete</span>
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="text-primary" onClick={() => handleEditEntry(entry.id)}>
-                                        <Edit className="h-4 w-4" />
-                                        <span className="sr-only">Edit</span>
-                                      </Button>
+                                      <div className="flex space-x-1">
+                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteEntry(entry.id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                          <span className="sr-only">Delete</span>
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="text-primary" onClick={() => handleEditEntry(entry.id)}>
+                                          <Edit className="h-4 w-4" />
+                                          <span className="sr-only">Edit</span>
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="text-blue-600" onClick={() => printInvoice(entry)}>
+                                          <Download className="h-4 w-4" />
+                                          <span className="sr-only">Print Invoice</span>
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </>
                                 )}
