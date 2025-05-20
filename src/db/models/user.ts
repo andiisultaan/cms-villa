@@ -48,3 +48,36 @@ export const getUserByUsername = async (username: string) => {
 
   return user;
 };
+
+export const deleteUser = async (userId: string) => {
+  const db = await getDb();
+  const result = await db.collection(COLLECTION_NAME).deleteOne({ _id: new ObjectId(userId) });
+
+  return result;
+};
+
+export const updateUser = async (userId: string, user: Partial<UserModel>) => {
+  const db = await getDb();
+  const result = await db.collection(COLLECTION_NAME).updateOne({ _id: new ObjectId(userId) }, { $set: user });
+
+  return result;
+};
+
+export const getUserById = async (userId: string) => {
+  const db = await getDb();
+  const user = (await db.collection(COLLECTION_NAME).findOne({ _id: new ObjectId(userId) })) as UserModel;
+
+  return user;
+};
+
+export const changeUserPassword = async (userId: string, newPassword: string) => {
+  const db = await getDb();
+
+  // Hash the new password before storing
+  const hashedPassword = hashText(newPassword);
+
+  // Update only the password field
+  const result = await db.collection(COLLECTION_NAME).updateOne({ _id: new ObjectId(userId) }, { $set: { password: hashedPassword } });
+
+  return result;
+};
