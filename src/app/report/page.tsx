@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Edit, Search, Trash2 } from "lucide-react";
+import { CalendarIcon, Download, Edit, Plus, Search, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import jsPDF from "jspdf";
 import { toast, Toaster } from "sonner";
@@ -19,6 +19,7 @@ import Navigation from "@/components/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { Input } from "@/components/ui/input";
 import { EditEntryPanel } from "@/components/edit-entry-dialog";
+import Link from "next/link";
 
 // Define types based on API response
 interface Booking {
@@ -1292,14 +1293,20 @@ export default function FinancialReportPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input type="search" placeholder="Cari..." className="pl-8 w-full sm:w-[250px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                        </div>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="search" placeholder="Cari..." className="pl-8 w-full sm:w-[250px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2 ml-auto">
+                        <Link href="/add-booking" className="flex items-center">
+                          <Button variant="outline">
+                            <Plus className="h-4 w-4 mr-2" />
+                            <span>Tambah Booking</span>
+                          </Button>
+                        </Link>
                         <Button variant="outline" onClick={handleExport}>
                           <Download className="h-4 w-4 mr-2" />
-                          <span>Export Pdf</span>
+                          <span>Export PDF</span>
                         </Button>
                       </div>
                     </div>
