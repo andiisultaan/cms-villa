@@ -93,7 +93,7 @@ export default function FinancialReportPage() {
   // Get user from auth context with fallback for when it's undefined
   const { data: session } = useAuth();
   const user = session?.user;
-  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "staff";
+  const isAdmin = session?.user?.role === "admin";
 
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
@@ -413,6 +413,8 @@ export default function FinancialReportPage() {
 
       // If user is admin, show all villas
       if (user.role === "admin") return true;
+
+      if (user.role === "staff") return true;
 
       // If user is owner, only show their villas
       if (user.role === "owner") {
@@ -1178,11 +1180,11 @@ export default function FinancialReportPage() {
             <Tabs defaultValue="detailed-financial" className="no-print" onValueChange={setActiveTab}>
               <TabsList className="mb-4">
                 <TabsTrigger value="detailed-financial">Laporan Keuangan Detail</TabsTrigger>
-                {(user?.role === "admin" || user?.role === "owner") && <TabsTrigger value="by-villa">Laporan Per Villa</TabsTrigger>}
+                {(user?.role === "admin" || user?.role === "owner" || user?.role === "staff") && <TabsTrigger value="by-villa">Laporan Per Villa</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="by-villa">
-                {user?.role === "admin" || user?.role === "owner" ? (
+                {user?.role === "admin" || user?.role === "owner" || user?.role === "staff" ? (
                   <div className="grid gap-6">
                     {/* Villa Summary Table */}
                     <Card>
@@ -1298,12 +1300,14 @@ export default function FinancialReportPage() {
                         <Input type="search" placeholder="Cari..." className="pl-8 w-full sm:w-[250px]" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                       </div>
                       <div className="flex gap-2 ml-auto">
-                        <Link href="/add-booking" className="flex items-center">
-                          <Button variant="outline">
-                            <Plus className="h-4 w-4 mr-2" />
-                            <span>Tambah Booking</span>
-                          </Button>
-                        </Link>
+                        {isAdmin && (
+                          <Link href="/add-booking" className="flex items-center">
+                            <Button variant="outline">
+                              <Plus className="h-4 w-4 mr-2" />
+                              <span>Tambah Booking</span>
+                            </Button>
+                          </Link>
+                        )}
                         <Button variant="outline" onClick={handleExport}>
                           <Download className="h-4 w-4 mr-2" />
                           <span>Export PDF</span>

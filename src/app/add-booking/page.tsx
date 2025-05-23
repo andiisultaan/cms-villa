@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, ChevronLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -43,12 +43,30 @@ type BookingData = {
   paymentStatus?: string;
 };
 
-// Mock data for villa selection - replace with actual data fetching
-const villas = [
-  { id: "villa1", name: "Villa Deluxe" },
-  { id: "villa2", name: "Villa Premium" },
-  { id: "villa3", name: "Villa Executive" },
-];
+type SerializedVilla = {
+  _id: string;
+  name: string;
+  description: string;
+  price: string;
+  capacity: string;
+  status: "available" | "booked" | "maintenance";
+  images: Array<{ url: string; publicId: string }>;
+};
+
+async function fetchVillas(): Promise<SerializedVilla[]> {
+  const response = await fetch("/api/villas", {
+    cache: "no-store", // Disable caching
+    headers: {
+      "Cache-Control": "no-cache",
+      pagma: "no-cache",
+    },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to fetch villas");
+  }
+  const data = await response.json();
+  return data.data;
+}
 
 // This schema matches the form fields and validation
 const formSchema = z
@@ -97,6 +115,7 @@ const formSchema = z
 
 export default function AddBookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [villas, setVillas] = useState<SerializedVilla[]>([]);
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -109,6 +128,17 @@ export default function AddBookingPage() {
       priceExtraBed: 0,
     },
   });
+
+  useEffect(() => {
+    fetchVillas()
+      .then(fetchedVillas => {
+        setVillas(fetchedVillas);
+      })
+      .catch(error => {
+        console.error("Error fetching villas:", error);
+        toast.error("Gagal memuat data villa");
+      });
+  }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
@@ -206,7 +236,7 @@ export default function AddBookingPage() {
                               </FormControl>
                               <SelectContent>
                                 {villas.map(villa => (
-                                  <SelectItem key={villa.id} value={villa.id}>
+                                  <SelectItem key={villa._id} value={villa._id}>
                                     {villa.name}
                                   </SelectItem>
                                 ))}
